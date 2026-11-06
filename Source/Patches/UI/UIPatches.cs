@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Reflection.Emit;
 using HarmonyLib;
 using RepoXR.Input;
@@ -84,10 +85,17 @@ internal static class UIPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> UIPointerHoverPatch(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            // Get coords using VR interactor
-            .MatchForward(false,
-                new CodeMatch(OpCodes.Call, Method(typeof(SemiFunc), nameof(SemiFunc.UIMousePosToUIPos))))
+        var matcher = new CodeMatcher(instructions)
+            // Get coords using VR interactor. 0.5.x added UIMousePosToUIPos(Vector2).
+            .MatchForward(false, new CodeMatch(IsUiMousePosToUiPos));
+        if (matcher.Instruction.operand is MethodInfo mousePos && mousePos.GetParameters().Length > 0)
+        {
+            var count = mousePos.GetParameters().Length;
+            for (var i = 0; i < count; i++)
+                matcher.Insert(new CodeInstruction(OpCodes.Pop));
+            matcher.Advance(count);
+        }
+        return matcher
             .SetOperandAndAdvance(PropertyGetter(typeof(XRRayInteractorManager),
                 nameof(XRRayInteractorManager.Instance)))
             .InsertAndAdvance(
@@ -111,6 +119,14 @@ internal static class UIPatches
             .Advance(-1) // pop bool from stack before branch
             .Insert(new CodeInstruction(OpCodes.Pop))
             .InstructionEnumeration();
+
+        static bool IsUiMousePosToUiPos(CodeInstruction instruction)
+        {
+            return instruction.opcode == OpCodes.Call
+                   && instruction.operand is MethodInfo method
+                   && method.DeclaringType == typeof(SemiFunc)
+                   && method.Name == nameof(SemiFunc.UIMousePosToUIPos);
+        }
 
         static bool RectangleContainsCanvasPoint(RectTransform viewport, Vector2 localPos, Camera _unused)
         {
@@ -147,7 +163,7 @@ internal static class UIPatches
     /// <summary>
     /// Detect UI hits using VR pointers instead of mouse cursor
     /// </summary>
-    [HarmonyPatch(typeof(SemiFunc), nameof(SemiFunc.UIMouseGetLocalPositionWithinRectTransform))]
+    [HarmonyPatch(typeof(SemiFunc), nameof(SemiFunc.UIMouseGetLocalPositionWithinRectTransform), typeof(RectTransform))]
     [HarmonyPrefix]
     private static bool UIMouseGetLocalPositionWithinRectTransformPatch(RectTransform rectTransform,
         ref Vector2 __result)
@@ -163,6 +179,18 @@ internal static class UIPatches
         __result = new Vector2(pointer.x - rect.x, pointer.y - rect.y) + pivotOff;
 
         return false;
+    }
+
+    /// <summary>
+    /// 0.5.x added an overload that takes an explicit mouse position. VR still uses the pointer.
+    /// </summary>
+    [HarmonyPatch(typeof(SemiFunc), nameof(SemiFunc.UIMouseGetLocalPositionWithinRectTransform), typeof(RectTransform),
+        typeof(Vector2))]
+    [HarmonyPrefix]
+    private static bool UIMouseGetLocalPositionWithinRectTransformAtPoint(RectTransform rectTransform,
+        ref Vector2 __result)
+    {
+        return UIMouseGetLocalPositionWithinRectTransformPatch(rectTransform, ref __result);
     }
 
     /// <summary>
