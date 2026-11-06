@@ -4,6 +4,7 @@ using System.Reflection.Emit;
 using HarmonyLib;
 using RepoXR.Managers;
 using RepoXR.Networking;
+using RepoXR.Patches;
 using UnityEngine;
 
 using static HarmonyLib.AccessTools;
@@ -20,11 +21,10 @@ internal static class ValuableArcticSnowBikePatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> BikeHandSteeringPatch(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
+        return GameSignatures.EditOrOriginal(instructions, "Snow bike hand steering", matcher => matcher
             .MatchForward(false,
                 new CodeMatch(OpCodes.Ldfld, Field(typeof(PlayerAvatar), nameof(PlayerAvatar.localCamera))))
-            .Set(OpCodes.Call, ((Func<PlayerAvatar, Transform>)GetSourceTransform).Method)
-            .InstructionEnumeration();
+            .Set(OpCodes.Call, ((Func<PlayerAvatar, Transform>)GetSourceTransform).Method));
 
         static Transform GetSourceTransform(PlayerAvatar player)
         {

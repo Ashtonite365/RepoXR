@@ -1,3 +1,12 @@
+# 1.3.4 (RepoXR FBT fork)
+
+**Fixes**:
+- The rest of the v0.5.1 launch errors after the CameraShake pin. `InputDisplayGetString` now binds its action and index by position, so the `_action` / `_index` rename no longer aborts the input patches that menu clicks depend on. Menu-button clicks are left on the normal pointer unless the VR ray is actually up.
+- `Quaternion.Angle` is pinned to `(Quaternion, Quaternion)`.
+- `PostProcessing.Start` is skipped when that method is gone. Lens and chromatic prefixes still apply.
+- Save-rename keyboard closing no longer asks 0Harmony to load `MenuPageSavesRename`.
+- Vehicle, snow-bike, debug-label, push/pull, and tumble-climb IL edits that miss their 0.4.4 anchors keep the original method instead of failing the patch class. The phys-grabber force-hold insert is not applied; it compiled into unverifiable IL on 0.5.1 and took the rest of the grabber patches down with it.
+
 # 1.3.3 (RepoXR FBT fork)
 
 **Fixes**:

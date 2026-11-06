@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using HarmonyLib;
@@ -51,5 +54,33 @@ internal static class GameSignatures
         for (var i = 0; i < extra; i++)
             matcher.Insert(new CodeInstruction(OpCodes.Pop));
         matcher.Advance(extra);
+    }
+
+    /// <summary>
+    /// Run an IL edit that was written against an older game build. If the anchor is gone,
+    /// keep the original method instead of walking off the end of the instruction list.
+    /// </summary>
+    internal static IEnumerable<CodeInstruction> EditOrOriginal(IEnumerable<CodeInstruction> instructions, string name,
+        Func<CodeMatcher, CodeMatcher> edit)
+    {
+        var original = instructions.ToList();
+        try
+        {
+            var matcher = edit(new CodeMatcher(original));
+            if (matcher.IsInvalid)
+            {
+                Logger.LogWarning($"{name} did not match this game build. Leaving that method unchanged.");
+                return original;
+            }
+
+            return matcher.InstructionEnumeration().ToList();
+        }
+        catch (Exception ex) when (ex is ArgumentOutOfRangeException or InvalidOperationException
+                                       or IndexOutOfRangeException or NullReferenceException)
+        {
+            Logger.LogWarning(
+                $"{name} did not match this game build ({ex.GetType().Name}). Leaving that method unchanged.");
+            return original;
+        }
     }
 }

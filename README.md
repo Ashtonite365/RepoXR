@@ -30,6 +30,7 @@ Here is a list of RepoXR versions and which version(s) of R.E.P.O. it supports
 
 | RepoXR FBT | R.E.P.O. Version |
 |------------|------------------|
+| v1.3.4 (0.5.1 patch sweep) | v0.5.1. Failed input, grabber, vehicle, and menu patches from 1.3.3 no longer abort startup |
 | v1.3.3 (0.5.1 Harmony overloads) | v0.5.1 VR startup. Shake and the other new overloads are named explicitly |
 | v1.3.2 (OpenXR startup on Unity 6) | v0.5.1 VR startup. Gameplay patches are still the v0.4.4 set |
 | v1.3.1 (pause-menu calibrate, live toggle) | v0.4.4 |

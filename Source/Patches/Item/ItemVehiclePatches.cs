@@ -4,6 +4,7 @@ using System.Reflection.Emit;
 using HarmonyLib;
 using RepoXR.Managers;
 using RepoXR.Networking;
+using RepoXR.Patches;
 using UnityEngine;
 using static HarmonyLib.AccessTools;
 
@@ -19,11 +20,10 @@ internal static class ItemVehiclePatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> DriftDeadzonePatch(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
+        return GameSignatures.EditOrOriginal(instructions, "Vehicle drift deadzone", matcher => matcher
             .MatchForward(false, new CodeMatch(OpCodes.Ldc_R4, 0.1f))
             .SetOpcodeAndAdvance(OpCodes.Ldarg_0)
-            .Insert(new CodeInstruction(OpCodes.Call, ((Func<ItemVehicle, float>)GetDriftDeadzone).Method))
-            .InstructionEnumeration();
+            .Insert(new CodeInstruction(OpCodes.Call, ((Func<ItemVehicle, float>)GetDriftDeadzone).Method)));
 
         static float GetDriftDeadzone(ItemVehicle vehicle) => vehicle.currentDriver.IsVRPlayer() ? 0.5f : 0.1f;
     }
@@ -32,48 +32,28 @@ internal static class ItemVehiclePatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> ApplyVehicleMovementPatch(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            .MatchForward(false,
-                new CodeMatch(OpCodes.Callvirt,
-                    Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform))))
-            .Repeat(m => m.Set(OpCodes.Call, ((Func<PlayerLocalCamera, Transform>)GetVehicleTargetForward).Method))
-            .InstructionEnumeration();
+        return ReplaceOverrideTransform(instructions, "Vehicle movement aim");
     }
 
     [HarmonyPatch(typeof(ItemVehicle), nameof(ItemVehicle.ApplyVehicleSteering))]
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> ApplyVehicleSteeringPatch(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            .MatchForward(false,
-                new CodeMatch(OpCodes.Callvirt,
-                    Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform))))
-            .Set(OpCodes.Call, ((Func<PlayerLocalCamera, Transform>)GetVehicleTargetForward).Method)
-            .InstructionEnumeration();
+        return ReplaceOverrideTransform(instructions, "Vehicle steering aim");
     }
 
     [HarmonyPatch(typeof(ItemVehicle), nameof(ItemVehicle.ApplyVehicleDrift))]
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> ApplyVehicleDriftPatch(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            .MatchForward(false,
-                new CodeMatch(OpCodes.Callvirt,
-                    Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform))))
-            .Set(OpCodes.Call, ((Func<PlayerLocalCamera, Transform>)GetVehicleTargetForward).Method)
-            .InstructionEnumeration();
+        return ReplaceOverrideTransform(instructions, "Vehicle drift aim");
     }
 
     [HarmonyPatch(typeof(ItemVehicle), nameof(ItemVehicle.UpdateSteering))]
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> UpdateSteeringPatch(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            .MatchForward(false,
-                new CodeMatch(OpCodes.Callvirt,
-                    Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform))))
-            .Set(OpCodes.Call, ((Func<PlayerLocalCamera, Transform>)GetVehicleTargetForward).Method)
-            .InstructionEnumeration();
+        return ReplaceOverrideTransform(instructions, "Vehicle steering update");
     }
 
     // TODO: Should we override GetOverrideTransform in LocalMeshUpdate?
@@ -82,17 +62,31 @@ internal static class ItemVehiclePatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> LateUpdatePatch(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            .MatchForward(false,
-                new CodeMatch(OpCodes.Callvirt,
-                    Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform))))
-            // Skip first match
+        return GameSignatures.EditOrOriginal(instructions, "Vehicle mesh aim", matcher => matcher
+            .MatchForward(false, OverrideTransformCall())
             .Advance(1)
-            .MatchForward(false,
-                new CodeMatch(OpCodes.Callvirt,
-                    Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform))))
-            .Set(OpCodes.Call, ((Func<PlayerLocalCamera, Transform>)GetVehicleTargetForward).Method)
-            .InstructionEnumeration();
+            .MatchForward(false, OverrideTransformCall())
+            .Set(OpCodes.Call, ((Func<PlayerLocalCamera, Transform>)GetVehicleTargetForward).Method));
+    }
+
+    static CodeMatch OverrideTransformCall() => new(OpCodes.Callvirt,
+        Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform)));
+
+    static IEnumerable<CodeInstruction> ReplaceOverrideTransform(IEnumerable<CodeInstruction> instructions, string name)
+    {
+        return GameSignatures.EditOrOriginal(instructions, name, matcher =>
+        {
+            var found = false;
+            matcher.MatchForward(false, OverrideTransformCall())
+                .Repeat(match =>
+                {
+                    found = true;
+                    match.Set(OpCodes.Call, ((Func<PlayerLocalCamera, Transform>)GetVehicleTargetForward).Method);
+                });
+            if (!found)
+                throw new InvalidOperationException("GetOverrideTransform was not called");
+            return matcher;
+        });
     }
 
     /// <summary>

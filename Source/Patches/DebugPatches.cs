@@ -14,9 +14,8 @@ internal static class DebugPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> InjectVRTextPatch(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
+        return GameSignatures.EditOrOriginal(instructions, "Debug tester VR label", matcher => matcher
             .MatchForward(false, new CodeMatch(OpCodes.Ldstr, "{0}\n{1} ({2})"))
-            .SetOperandAndAdvance("{0} (VR)\n{1} ({2})")
-            .InstructionEnumeration();
+            .SetOperandAndAdvance("{0} (VR)\n{1} ({2})"));
     }
 }

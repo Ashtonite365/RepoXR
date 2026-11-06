@@ -5,6 +5,7 @@ using System.Reflection.Emit;
 using HarmonyLib;
 using RepoXR.Assets;
 using RepoXR.Input;
+using RepoXR.Managers;
 using RepoXR.UI;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -243,9 +244,17 @@ internal static class InputPatches
     /// </summary>
     [HarmonyPatch(typeof(InputManager), nameof(InputManager.InputDisplayGetString))]
     [HarmonyPrefix]
-    private static bool InputDisplayGetString(InputAction action, int bindingIndex, ref string __result)
+    private static bool InputDisplayGetString(InputAction __0, int __1, ref string __result)
     {
-        var binding = action.bindings[bindingIndex].effectivePath;
+        // 0.4.4 named these action/bindingIndex. 0.5.x renamed them _action/_index.
+        // Harmony binds __0 and __1 by position, so either name works.
+        if (__1 < 0 || __1 >= __0.bindings.Count)
+        {
+            __result = "Unassigned";
+            return false;
+        }
+
+        var binding = __0.bindings[__1].effectivePath;
         __result = Utils.GetControlSpriteString(binding);
 
         return false;
@@ -380,6 +389,11 @@ internal static class InputPatches
     [HarmonyPrefix]
     private static bool PreventDoublePressPatch(Button __instance)
     {
+        // Only suppress the Unity click when the VR pointer is actually handling it.
+        // Otherwise a failed ray leaves menu buttons unable to take mouse or controller clicks.
+        if (!VRSession.InVR || XRRayInteractorManager.Instance is null)
+            return true;
+
         return !__instance.TryGetComponent<MenuButton>(out _);
     }
 
@@ -406,9 +420,9 @@ internal static class InputPatches
     private static CodeMatcher PatchMouseInputs(this CodeMatcher matcher)
     {
         var matchButton = new CodeMatch(OpCodes.Call,
-            Method(typeof(UnityEngine.Input), nameof(UnityEngine.Input.GetMouseButton)));
+            Method(typeof(UnityEngine.Input), nameof(UnityEngine.Input.GetMouseButton), [typeof(int)]));
         var matchButtonDown = new CodeMatch(OpCodes.Call,
-            Method(typeof(UnityEngine.Input), nameof(UnityEngine.Input.GetMouseButtonDown)));
+            Method(typeof(UnityEngine.Input), nameof(UnityEngine.Input.GetMouseButtonDown), [typeof(int)]));
 
         return matcher
             .MatchForward(false, matchButton)

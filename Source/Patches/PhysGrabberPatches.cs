@@ -24,11 +24,17 @@ internal static class PhysGrabberPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> UpdatePatches(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            .MatchForward(false,
-                new CodeMatch(OpCodes.Callvirt, Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform))))
-            .Repeat(matcher => matcher.Set(OpCodes.Call, PlayerLocalCameraExtensions.GetHandOverrideTransformMethod))
-            .InstructionEnumeration();
+        return GameSignatures.EditOrOriginal(instructions, "PhysGrabber hand aim", matcher =>
+        {
+            matcher.MatchForward(false,
+                new CodeMatch(OpCodes.Callvirt,
+                    Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform))));
+            if (matcher.IsInvalid)
+                throw new InvalidOperationException("GetOverrideTransform was not called");
+
+            return matcher.Repeat(match =>
+                match.Set(OpCodes.Call, PlayerLocalCameraExtensions.GetHandOverrideTransformMethod));
+        });
     }
 
     /// <summary>
@@ -38,7 +44,7 @@ internal static class PhysGrabberPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> PushPullSlowdownPatch(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
+        return GameSignatures.EditOrOriginal(instructions, "PhysGrabber push/pull slowdown", matcher => matcher
             .MatchForward(false, new CodeMatch(OpCodes.Ldc_R4, 0.2f))
             .SetOperandAndAdvance(0.1f)
             .Insert(
@@ -54,8 +60,7 @@ internal static class PhysGrabberPatches
                 new CodeInstruction(OpCodes.Callvirt,
                     Method(typeof(InputManager), nameof(InputManager.KeyPullAndPush))),
                 new CodeInstruction(OpCodes.Mul)
-            )
-            .InstructionEnumeration();
+            ));
     }
 
     /// <summary>
@@ -108,17 +113,16 @@ internal static class PhysGrabberPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> ObjectTurningPatches(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            // Use VR controls for rotation instead of mouse inputs
+        // Hard-coded local slots from 0.4.4. If "Mouse X" moved, leave turning alone
+        // instead of emitting ldloca against locals this build does not have.
+        return GameSignatures.EditOrOriginal(instructions, "PhysGrabber object turning", matcher => matcher
             .MatchForward(false, new CodeMatch(OpCodes.Ldstr, "Mouse X"))
             .RemoveInstructions(10)
             .Insert(
-                // TESTER: Check these operands in Debug vs Release builds
-                new CodeInstruction(OpCodes.Ldloca_S, Plugin.GameDebugBuild ? 13 : 5), // Mouse X
-                new CodeInstruction(OpCodes.Ldloca_S, Plugin.GameDebugBuild ? 14 : 6), // Mouse Y
+                new CodeInstruction(OpCodes.Ldloca_S, Plugin.GameDebugBuild ? 13 : 5),
+                new CodeInstruction(OpCodes.Ldloca_S, Plugin.GameDebugBuild ? 14 : 6),
                 new CodeInstruction(OpCodes.Call, Method(typeof(PhysGrabberPatches), nameof(GetRotationInput)))
-            )
-            .InstructionEnumeration();
+            ));
     }
 
     private static void GetRotationInput(out float x, out float y)
@@ -178,20 +182,11 @@ internal static class PhysGrabberPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> ForceHoldPatch(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            .MatchForward(false,
-                new CodeMatch(OpCodes.Ldfld,
-                    Field(typeof(GameplayManager), nameof(GameplayManager.itemUnequipAutoHold))))
-            .Advance(-2)
-            .InsertAndAdvance(
-                new CodeInstruction(OpCodes.Ldarg_0),
-                new CodeInstruction(OpCodes.Ldfld, Field(typeof(PhysGrabber), nameof(PhysGrabber.overrideGrabTimer))),
-                new CodeInstruction(OpCodes.Call, ((Func<bool, float, bool>)ShouldToggleGrabOff).Method)
-            )
-            .InstructionEnumeration();
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static bool ShouldToggleGrabOff(bool grabHeld, float grabTimer) => grabHeld && grabTimer <= 0;
+        // 0.5.1 moved the auto-hold check. The 0.4.4 insert compiled into a call the
+        // verifier rejected (PhysGrabber.Update IL_069b) and that aborted every other
+        // grabber patch. Leave Update's grab toggle on the game's own path.
+        _ = instructions;
+        return instructions;
     }
 }
 
@@ -239,13 +234,13 @@ internal static class PhysGrabberUniversalPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> HandBasedTumbleClimbPatch(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
+        return GameSignatures.EditOrOriginal(instructions, "PhysGrabber tumble climb", matcher => matcher
             .MatchForward(false,
-                new CodeMatch(OpCodes.Call, Method(typeof(Quaternion), nameof(Quaternion.Angle))))
+                new CodeMatch(OpCodes.Call,
+                    Method(typeof(Quaternion), nameof(Quaternion.Angle), [typeof(Quaternion), typeof(Quaternion)])))
             .Advance(-5)
             .SetAndAdvance(OpCodes.Call, ((Func<PhysGrabber, Quaternion>)GetRotation).Method)
-            .RemoveInstruction()
-            .InstructionEnumeration();
+            .RemoveInstruction());
 
         static Quaternion GetRotation(PhysGrabber grabber)
         {
