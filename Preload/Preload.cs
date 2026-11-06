@@ -68,6 +68,28 @@ public static class Preload
         
         File.Copy(oxrPlugin, oxrPluginTarget, true);
         File.Copy(oxrLoader, oxrLoaderTarget, true);
+
+        // The managed player assembly lives next to the plugin, not next to this patcher.
+        // Empty its analytics methods before BepInEx loads it. Unity 6 has no AnalyticsResult,
+        // and that missing type is what aborts an otherwise successful OpenXR session.
+        foreach (var result in RepoXR.OpenXrPlayerFix.Apply(OpenXrAssemblyCandidates(current)))
+        {
+            if (result.Error != null)
+                Logger.LogWarning($"Could not bypass OpenXR analytics in {result.Path}: {result.Error}");
+            else if (result.MethodsNeutralized > 0)
+                Logger.LogInfo(
+                    $"Bypassed OpenXR analytics in {result.Path} ({result.MethodsNeutralized} methods). VR startup no longer depends on UnityEngine.Analytics.AnalyticsResult.");
+            else
+                Logger.LogInfo($"OpenXR analytics bypass is already in place ({result.Path}).");
+        }
+    }
+
+    static IEnumerable<string> OpenXrAssemblyCandidates(string preloadDirectory)
+    {
+        yield return Path.Combine(preloadDirectory, "RuntimeDeps", "Unity.XR.OpenXR.dll");
+        yield return Path.Combine(preloadDirectory, "..", "..", "plugins", "RepoXR", "RuntimeDeps", "Unity.XR.OpenXR.dll");
+        yield return Path.Combine(preloadDirectory, "..", "plugins", "RepoXR", "RuntimeDeps", "Unity.XR.OpenXR.dll");
+        yield return Path.Combine(preloadDirectory, "..", "..", "plugins", "RepoXR", "Unity.XR.OpenXR.dll");
     }
 
     /// <summary>

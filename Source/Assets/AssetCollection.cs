@@ -82,9 +82,9 @@ internal static class AssetCollection
             return false;
         }
 
-        // Load translations
-        Addressables.LoadContentCatalogAsync(Path.Combine(AddressablesPath, "catalog_0.1.json"), true)
-            .WaitForCompletion();
+        // Translations only. Unity 6 players ship Addressables without ENABLE_JSON_CATALOG, so
+        // catalog_0.1.json is rejected. That does not stop the asset bundle or OpenXR.
+        LoadLocalizationCatalog();
 
         OpenXRFeatures = assetBundle.LoadAsset<OpenXRFeaturePack>("OpenXRFeatures");
 
@@ -136,6 +136,25 @@ internal static class AssetCollection
         }
 
         return true;
+    }
+
+    static void LoadLocalizationCatalog()
+    {
+        const string catalogMessage =
+            "VR localization catalog did not load. This game expects a binary Addressables catalog and RepoXR ships catalog_0.1.json. Headset and controller VR still start. Tutorial text overrides stay on the desktop wording.";
+
+        try
+        {
+            var catalog = Addressables.LoadContentCatalogAsync(Path.Combine(AddressablesPath, "catalog_0.1.json"), true);
+            catalog.WaitForCompletion();
+
+            if (catalog.Status != AsyncOperationStatus.Succeeded)
+                Logger.LogWarning(catalogMessage);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"{catalogMessage} ({ex.GetType().Name}: {ex.Message})");
+        }
     }
 
     public static AsyncOperationHandle<LocalizedAsset> GetLocalizedAsset(string name)

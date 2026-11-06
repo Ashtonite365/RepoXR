@@ -97,16 +97,24 @@ internal static class TutorialPatches
         var map = __instance.tutorialPages[12];
         var expressions = __instance.tutorialPages[25];
 
-        inventoryFill.localizedText = Utils.L("TUTORIAL.INVENTORY_FILL.TEXT");
-        inventoryFill.localizedDummyText = Utils.L("TUTORIAL.INVENTORY_FILL.DUMMY_TEXT");
+        try
+        {
+            inventoryFill.localizedText = Utils.L("TUTORIAL.INVENTORY_FILL.TEXT");
+            inventoryFill.localizedDummyText = Utils.L("TUTORIAL.INVENTORY_FILL.DUMMY_TEXT");
 
-        inventoryEmpty.localizedText = Utils.L("TUTORIAL.INVENTORY_EMPTY.TEXT");
-        inventoryEmpty.localizedDummyText = Utils.L("TUTORIAL.INVENTORY_EMPTY.DUMMY_TEXT");
+            inventoryEmpty.localizedText = Utils.L("TUTORIAL.INVENTORY_EMPTY.TEXT");
+            inventoryEmpty.localizedDummyText = Utils.L("TUTORIAL.INVENTORY_EMPTY.DUMMY_TEXT");
 
-        map.localizedText = Utils.L("TUTORIAL.MAP.TEXT");
-        map.localizedDummyText = Utils.L("TUTORIAL.MAP.DUMMY_TEXT");
+            map.localizedText = Utils.L("TUTORIAL.MAP.TEXT");
+            map.localizedDummyText = Utils.L("TUTORIAL.MAP.DUMMY_TEXT");
 
-        expressions.localizedText = Utils.L("TUTORIAL.EXPRESSIONS.TEXT");
+            expressions.localizedText = Utils.L("TUTORIAL.EXPRESSIONS.TEXT");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(
+                $"Left the tutorial on the desktop prompts. The VR string catalog is unavailable on this game build ({ex.GetType().Name}: {ex.Message}).");
+        }
     }
 
     /// <summary>
