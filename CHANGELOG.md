@@ -1,3 +1,8 @@
+# 1.3.6 (RepoXR FBT fork)
+
+**Fixes**:
+- Hand aim for grab turning, tumble climb, the snow bike, and vehicle drift, movement, steering, and steering update now runs on R.E.P.O. v0.5.1. Those methods no longer call `GetOverrideTransform`, so the old anchors missed. Each one now aims the live camera from the hand for the length of the call and restores it afterward. Tumble climb no longer deletes instructions in front of `Quaternion.Angle`; it replaces the quaternion already on the stack. Builds that still contain the 0.4.4 calls keep that direct swap.
+
 # 1.3.5 (RepoXR FBT fork)
 
 **Fixes**:

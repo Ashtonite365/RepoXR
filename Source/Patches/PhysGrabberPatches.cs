@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using HarmonyLib;
@@ -193,21 +194,34 @@ internal static class PhysGrabberPatches
 [RepoXRPatch(RepoXRPatchTarget.Universal)]
 internal static class PhysGrabberUniversalPatches
 {
+    static bool turningUsesOverrideCall;
+
     [HarmonyPatch(typeof(PhysGrabber), nameof(PhysGrabber.ObjectTurning))]
     [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> ObjectTurningPatches(IEnumerable<CodeInstruction> instructions)
+    private static IEnumerable<CodeInstruction> HandAimTurningSwap(IEnumerable<CodeInstruction> instructions)
     {
-        return GameSignatures.EditOrOriginal(instructions, "PhysGrabber turning hand aim", matcher =>
-        {
-            var replacement = PlayerLocalCameraExtensions.GetHandOverrideTransformMethod;
-            var match = new CodeMatch(OpCodes.Callvirt,
-                Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform)));
-            matcher.MatchForward(false, match);
-            if (matcher.IsInvalid)
-                throw new InvalidOperationException("GetOverrideTransform was not called");
+        // 0.4.4 called GetOverrideTransform here. Swap that call when it is still present.
+        // 0.5.1 removed it; the prefix below aims the camera for the length of the call.
+        var edited = SwapOverrideTransform(instructions, PlayerLocalCameraExtensions.GetHandOverrideTransformMethod,
+            out turningUsesOverrideCall);
+        Logger.LogInfo(turningUsesOverrideCall
+            ? "PhysGrabber.ObjectTurning hand aim swapped GetOverrideTransform."
+            : "PhysGrabber.ObjectTurning hand aim follows the hand for each call.");
+        return edited;
+    }
 
-            return matcher.Repeat(hit => hit.Set(OpCodes.Call, replacement));
-        });
+    [HarmonyPatch(typeof(PhysGrabber), nameof(PhysGrabber.ObjectTurning))]
+    [HarmonyPrefix]
+    private static void HandAimTurningPrefix(PhysGrabber __instance, out AimRedirect __state)
+    {
+        __state = turningUsesOverrideCall ? AimRedirect.None : AimRedirect.ForGrabTurn(__instance);
+    }
+
+    [HarmonyPatch(typeof(PhysGrabber), nameof(PhysGrabber.ObjectTurning))]
+    [HarmonyPostfix]
+    private static void HandAimTurningPostfix(AimRedirect __state)
+    {
+        __state?.Restore();
     }
 
     /// <summary>
@@ -230,16 +244,61 @@ internal static class PhysGrabberUniversalPatches
     }
 
     /// <summary>
-    /// 0.5.1 still calls Quaternion.Angle, but the instructions around that call are not the
-    /// 0.4.4 sequence. Rewriting them produced unverifiable IL (GrabStateClimb call 0x0000f1)
-    /// and failed this whole patch class. Climb keeps the game's own rotation.
+    /// Replace the camera quaternion used by the first Quaternion.Angle call. The previous
+    /// edit deleted the instructions in front of that call and left an unverifiable call
+    /// (GrabStateClimb IL_0409). This insert only consumes the quaternion already on the
+    /// stack and pushes the hand rotation, so the method stays verifiable.
     /// </summary>
     [HarmonyPatch(typeof(PhysGrabber), nameof(PhysGrabber.GrabStateClimb))]
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> HandBasedTumbleClimbPatch(IEnumerable<CodeInstruction> instructions)
     {
-        Logger.LogInfo(
-            "Leaving PhysGrabber.GrabStateClimb unchanged. The 0.5.1 method body does not match the hand-rotation edit.");
-        return instructions;
+        var list = new List<CodeInstruction>(instructions);
+        var matcher = new CodeMatcher(list);
+        matcher.MatchForward(false, new CodeMatch(IsQuaternionAngle));
+        if (matcher.IsInvalid)
+        {
+            Logger.LogInfo(
+                "PhysGrabber.GrabStateClimb has no Quaternion.Angle on this build. Hand rotation is applied through ClimbOrbitRotationGet when that method exists.");
+            return list;
+        }
+
+        matcher.Insert(
+            new CodeInstruction(OpCodes.Ldarg_0),
+            new CodeInstruction(OpCodes.Call, Method(typeof(AimRedirect), nameof(AimRedirect.ClimbRotation))));
+        Logger.LogInfo("PhysGrabber.GrabStateClimb hand rotation applies at Quaternion.Angle.");
+        return matcher.InstructionEnumeration();
+    }
+
+    static bool IsQuaternionAngle(CodeInstruction instruction)
+    {
+        return (instruction.opcode == OpCodes.Call || instruction.opcode == OpCodes.Callvirt)
+               && instruction.operand is MethodInfo method
+               && method.DeclaringType == typeof(Quaternion)
+               && method.Name == nameof(Quaternion.Angle)
+               && method.GetParameters().Length == 2;
+    }
+
+    static IEnumerable<CodeInstruction> SwapOverrideTransform(IEnumerable<CodeInstruction> instructions,
+        MethodInfo replacement, out bool swapped)
+    {
+        var list = new List<CodeInstruction>(instructions);
+        swapped = false;
+        foreach (var ins in list)
+        {
+            if (ins.operand is not MethodInfo method)
+                continue;
+            if (method.DeclaringType != typeof(PlayerLocalCamera) ||
+                method.Name != nameof(PlayerLocalCamera.GetOverrideTransform))
+                continue;
+            if (ins.opcode != OpCodes.Call && ins.opcode != OpCodes.Callvirt)
+                continue;
+
+            ins.opcode = OpCodes.Call;
+            ins.operand = replacement;
+            swapped = true;
+        }
+
+        return list;
     }
 }
