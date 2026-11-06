@@ -1,3 +1,10 @@
+# 1.3.1 (RepoXR FBT fork)
+
+**Changes**:
+- Pause menu (the game's escape page) has Body Tracking on/off and Calibrate Body buttons
+- Full-body tracking can be toggled during a session. The Vive tracker profile is registered when VR starts, and the switch only applies or ignores poses
+- Calibration shows a T-pose copy of the semibot with circles on the live tracker positions. Both controller triggers confirm it
+
 # 1.3.0 (RepoXR FBT fork)
 
 This build is Ashtonite365's fork of DaXcess/RepoXR. It is not the official Thunderstore package.

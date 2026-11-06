@@ -35,26 +35,41 @@ Set SlimeVR's virtual trackers to those same SteamVR roles. Elbow, knee, and sho
 
 **Auto** (the default device choice) pairs a slot with the tracker whose SteamVR role matches the body role. A waist slot looks for a waist tracker, a left-foot slot looks for a left-foot tracker, and so on. To use a different physical tracker, open the VR settings menu after the trackers are connected and pick it on that slot. The list is remembered in the config so the choice stays put if a tracker disconnects for a moment.
 
-Turning full-body tracking on registers the tracker profile when OpenXR starts. **Restart the game** after you enable it. Enabling it mid-session logs a reminder and leaves the headset and controllers alone. The profile is additive, so it should not replace controller bindings. If controllers ever stop responding after you enable tracking, turn **Full Body Tracking** off and restart.
+## Turning tracking on and off
+
+OpenXR cannot add an interaction profile after the session has already started. This fork therefore registers the additive Vive tracker profile **every time VR starts**, whether or not full-body tracking is enabled. The in-game switch does not reload OpenXR. It only starts or stops applying tracker poses. Headset and controller bindings stay on their own profiles.
+
+The profile is additive. If controllers ever stop responding, turn **Body Tracking** off in the pause menu. You should not need to restart to flip tracking itself. A restart is only needed if the tracker profile failed to register at launch (the log will say so).
+
+## Pause menu
+
+R.E.P.O. does not have a separate VR pause screen. The in-game pause UI is the game's escape menu (`MenuPageEsc`). RepoXR parents that page into the VR pause canvas when you open it. This fork adds two buttons on that page, under the existing list:
+
+- **Body Tracking: On / Off** — applies or ignores tracker poses immediately
+- **Calibrate Body** — closes the pause menu and starts the calibration preview
+
+The same on/off flag is still **Gameplay → Full Body Tracking** if you want it in the settings list or the BepInEx config.
 
 ## Calibrate
 
-1. Enable **Full Body Tracking** and restart.
-2. Stand in a level, feet under your hips, looking forward, in the same neutral stance as the semibot. Not crouched, not tumbling, not in the main menu.
-3. Either set **Gameplay → Calibrate Full Body** to **Now**, or press **F9**.
+1. In a level, open the pause menu and choose **Calibrate Body**. That also turns body tracking on if it was off. **F9** opens the same preview. If the preview is already open, F9 confirms it. The confirm you should use in VR is both triggers, not F9.
+2. A copy of your semibot appears in front of you, held in a T-pose (arms out, legs straight). Colored circles sit where your live trackers are, relative to that model, so you can see each puck against the hips, chest, or feet.
+3. Stand in that T-pose. Press **both controller triggers at the same time** (the Activate buttons, not the grips). The preview closes and the offsets are saved.
 
-The setting flips back to Idle. Calibration stores the offset from each tracker to the matching bone, so a puck worn on your hip does not have to sit inside the mesh. It is saved in `BepInEx/config/io.ashtonite.repoxr.fbt.cfg` under `[Internal] FbtCalibrationData`. Delete that value to force a fresh calibration. Changing a slot's role or tracker invalidates that slot until you calibrate again.
+Calibration is stored in `BepInEx/config/io.ashtonite.repoxr.fbt.cfg` under `[Internal] FbtCalibrationData`. Delete that value to force a fresh calibration. Changing a slot's role or tracker invalidates that slot until you calibrate again.
 
 Until a slot is calibrated, that bone stays on the normal animation even if the tracker is live.
+
+The Gameplay setting **Calibrate Full Body** still opens this preview. It is not the only place to start it.
 
 ## Settings
 
 In the VR settings menu, category **Gameplay**:
 
-- **Full Body Tracking** — off by default
+- **Full Body Tracking** — off by default, and safe to change during a session
 - **Body Slot 1 / 2 / 3** — waist, left foot, right foot, chest, or unused
-- **Slot 1 / 2 / 3 Tracker** — Auto, or a tracker that has been seen since the last restart
-- **Calibrate Full Body** — stand straight, then set it to Now
+- **Slot 1 / 2 / 3 Tracker** — Auto, or a tracker that has been seen since launch
+- **Calibrate Full Body** — opens the T-pose preview
 
 The same keys live in the BepInEx config file if you would rather edit them by hand. Slot device `0` means Auto.
 

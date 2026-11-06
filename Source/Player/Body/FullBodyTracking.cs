@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using RepoXR.Assets;
 using RepoXR.Managers;
 using RepoXR.Networking;
 using NetworkPlayer = RepoXR.Networking.NetworkPlayer;
@@ -11,28 +12,36 @@ using UnityEngine.InputSystem;
 namespace RepoXR.Player;
 
 /// <summary>
-/// Local 3-slot full-body tracking. Disabled unless Gameplay &gt; Full Body Tracking is on.
+/// Local 3-slot full-body tracking. The OpenXR tracker profile is registered at
+/// startup; this switch only controls whether tracker poses are applied.
 /// </summary>
 [DefaultExecutionOrder(5000)]
 public class FullBodyTracking : MonoBehaviour
 {
     public const int SlotCount = 3;
 
-    public static bool CalibrationRequested { get; private set; }
+    public static bool CalibrationRequested => previewRequested;
+
+    static bool previewRequested;
 
     readonly SemibotBodySolver solver = new();
     readonly BodyPose[] poses = new BodyPose[SlotCount];
     readonly ResolvedSlot[] resolved = new ResolvedSlot[SlotCount];
+    readonly TrackerDot[] dots = new TrackerDot[SlotCount];
 
     Transform? trackingOrigin;
     CalibrationStore calibration = new();
+    BodyCalibrationPreview preview;
     InputAction? calibrateKey;
+    InputAction? leftTrigger;
+    InputAction? rightTrigger;
     bool sentActive;
-    bool loggedRestart;
+    bool loggedFeature;
     bool loggedUncalibrated;
     bool loggedNoDevices;
     bool loggedDuplicate;
     bool loggedWaitingToCalibrate;
+    bool triggersReleased;
 
     struct ResolvedSlot
     {
@@ -57,8 +66,16 @@ public class FullBodyTracking : MonoBehaviour
 
     public static void RequestCalibration()
     {
-        CalibrationRequested = true;
-        Logger.LogInfo("Full body calibration requested. Stand straight in-game with your trackers on.");
+        BeginCalibrationPreview();
+    }
+
+    public static void BeginCalibrationPreview()
+    {
+        if (!Plugin.Config.EnableFullBodyTracking.Value)
+            Plugin.Config.EnableFullBodyTracking.Value = true;
+
+        previewRequested = true;
+        Logger.LogInfo("Full body calibration started. Match the T-pose, then press both triggers.");
     }
 
     public void Initialize(Transform origin)
@@ -70,17 +87,41 @@ public class FullBodyTracking : MonoBehaviour
     void Awake()
     {
         calibrateKey = new InputAction(binding: "<Keyboard>/f9");
-        calibrateKey.performed += _ => RequestCalibration();
+        calibrateKey.performed += _ => OnCalibrateKey();
         calibrateKey.Enable();
+
+        leftTrigger = new InputAction(binding: "<XRController>{LeftHand}/triggerPressed");
+        leftTrigger.AddBinding("<XRController>{LeftHand}/triggerButton");
+        rightTrigger = new InputAction(binding: "<XRController>{RightHand}/triggerPressed");
+        rightTrigger.AddBinding("<XRController>{RightHand}/triggerButton");
+        leftTrigger.Enable();
+        rightTrigger.Enable();
+
+        preview = gameObject.AddComponent<BodyCalibrationPreview>();
     }
 
     void OnDestroy()
     {
-        if (calibrateKey == null)
+        DisposeAction(calibrateKey);
+        DisposeAction(leftTrigger);
+        DisposeAction(rightTrigger);
+    }
+
+    static void DisposeAction(InputAction? action)
+    {
+        if (action == null)
             return;
 
-        calibrateKey.Disable();
-        calibrateKey.Dispose();
+        action.Disable();
+        action.Dispose();
+    }
+
+    void OnCalibrateKey()
+    {
+        if (preview && preview.IsShown)
+            CommitPreview(PlayerController.instance ? PlayerController.instance.playerAvatarScript : null!);
+        else
+            BeginCalibrationPreview();
     }
 
     void LateUpdate()
@@ -88,18 +129,24 @@ public class FullBodyTracking : MonoBehaviour
         var player = VRSession.Instance ? VRSession.Instance.Player : null;
         var avatar = PlayerController.instance ? PlayerController.instance.playerAvatarScript : null;
 
+        if (previewRequested)
+            TryStartPreview(avatar);
+
         if (!Plugin.Config.EnableFullBodyTracking.Value)
         {
+            if (preview && preview.IsShown)
+                preview.Hide();
+
             if (sentActive)
                 PublishInactive(player);
             return;
         }
 
-        if (!ViveTrackerFeature.Injected && !loggedRestart)
+        if (!ViveTrackerFeature.Injected && !loggedFeature)
         {
-            loggedRestart = true;
+            loggedFeature = true;
             Logger.LogWarning(
-                "Full body tracking was turned on after startup. Restart the game so SteamVR/SlimeVR trackers can be bound. Headset and controller VR keep working.");
+                "The Vive tracker profile was not registered. Restart the game once so trackers can bind. The pause-menu switch still enables and disables posing.");
         }
 
         if (!trackingOrigin || avatar == null)
@@ -108,14 +155,79 @@ public class FullBodyTracking : MonoBehaviour
         var visuals = avatar.playerAvatarVisuals;
         if (visuals == null)
             return;
+
         ResolveSlots();
-
-        if (CalibrationRequested)
-            TryCalibrate(visuals);
-
+        UpdatePreview(avatar);
         BuildPoses();
         solver.Apply(avatar, visuals, poses);
         Publish(player);
+    }
+
+    void TryStartPreview(PlayerAvatar? avatar)
+    {
+        if (SemiFunc.MenuLevel() || avatar == null || !avatar.playerAvatarVisuals || avatar.isTumbling || avatar.deadSet)
+        {
+            if (!loggedWaitingToCalibrate)
+            {
+                loggedWaitingToCalibrate = true;
+                Logger.LogInfo("Full body calibration will open once you are in a level and not tumbling.");
+            }
+
+            return;
+        }
+
+        loggedWaitingToCalibrate = false;
+        triggersReleased = false;
+        preview.Show(avatar);
+        previewRequested = !preview.IsShown;
+    }
+
+    void UpdatePreview(PlayerAvatar avatar)
+    {
+        if (!preview || !preview.IsShown || !trackingOrigin)
+            return;
+
+        for (var i = 0; i < SlotCount; i++)
+        {
+            var slot = resolved[i];
+            dots[i] = new TrackerDot
+            {
+                Label = slot.Role.ToString(),
+                Active = slot.HasSample && slot.Sample.IsTracked && slot.Role != BodyRole.Unused,
+                WorldPosition = trackingOrigin!.TransformPoint(slot.Sample.LocalPosition)
+            };
+        }
+
+        preview.Tick(avatar, dots);
+
+        if (!BothTriggersPressed())
+        {
+            triggersReleased = true;
+            return;
+        }
+
+        if (triggersReleased && !EscapeMenuOpen())
+            CommitPreview(avatar);
+    }
+
+    bool BothTriggersPressed()
+    {
+        var assetLeft = AssetCollection.DefaultXRActions
+            ? AssetCollection.DefaultXRActions.FindAction("Left/Activate")
+            : null;
+        var assetRight = AssetCollection.DefaultXRActions
+            ? AssetCollection.DefaultXRActions.FindAction("Right/Activate")
+            : null;
+
+        var left = (assetLeft != null && assetLeft.IsPressed()) || (leftTrigger != null && leftTrigger.IsPressed());
+        var right = (assetRight != null && assetRight.IsPressed()) || (rightTrigger != null && rightTrigger.IsPressed());
+        return left && right;
+    }
+
+    static bool EscapeMenuOpen()
+    {
+        return MenuManager.instance && MenuManager.instance.currentMenuPage &&
+               MenuManager.instance.currentMenuPage.menuPageIndex == MenuPageIndex.Escape;
     }
 
     void ResolveSlots()
@@ -217,40 +329,18 @@ public class FullBodyTracking : MonoBehaviour
         return false;
     }
 
-    void TryCalibrate(PlayerAvatarVisuals visuals)
+    void CommitPreview(PlayerAvatar avatar)
     {
-        CalibrationRequested = false;
-
-        if (SemiFunc.MenuLevel())
-        {
-            if (!loggedWaitingToCalibrate)
-            {
-                loggedWaitingToCalibrate = true;
-                Logger.LogInfo("Full body calibration will run once you are in a level, standing straight.");
-            }
-
-            CalibrationRequested = true;
-            return;
-        }
-
-        loggedWaitingToCalibrate = false;
-
-        if (visuals.currentPose != PlayerAvatarVisuals.Pose.Stand)
-        {
-            Logger.LogWarning("Full body calibration needs you standing straight (not crouching or tumbling). Request it again with F9 or the Gameplay setting.");
-            return;
-        }
-
-        if (!trackingOrigin)
+        if (!preview || !preview.IsShown || avatar == null || !trackingOrigin)
             return;
 
         var calibrated = 0;
         for (var i = 0; i < SlotCount; i++)
         {
-            if (!resolved[i].HasSample || !resolved[i].Sample.IsTracked)
+            if (!resolved[i].HasSample || !resolved[i].Sample.IsTracked || resolved[i].Role == BodyRole.Unused)
                 continue;
 
-            if (!solver.TryGetAnchor(visuals, resolved[i].Role, out var anchorPos, out var anchorRot))
+            if (!preview.TryGetReference(resolved[i].Role, avatar.transform, out var anchorPos, out var anchorRot))
                 continue;
 
             var trackerPos = trackingOrigin!.TransformPoint(resolved[i].Sample.LocalPosition);
@@ -277,12 +367,14 @@ public class FullBodyTracking : MonoBehaviour
         if (calibrated == 0)
         {
             Logger.LogWarning(
-                "Full body calibration found no tracked slot. Turn tracking on, map the three slots, and stand inside the playspace.");
+                "Calibration found no tracked slot. Map the three slots, stand in the T-pose, then press both triggers again.");
+            triggersReleased = false;
             return;
         }
 
         Plugin.Config.FbtCalibrationData.Value = JsonConvert.SerializeObject(calibration);
         loggedUncalibrated = false;
+        preview.Hide();
         Logger.LogInfo($"Full body calibration saved for {calibrated} tracker slot(s).");
     }
 
@@ -322,7 +414,7 @@ public class FullBodyTracking : MonoBehaviour
         if (anyUncalibrated && !loggedUncalibrated)
         {
             loggedUncalibrated = true;
-            Logger.LogInfo("A full-body tracker is connected but not calibrated. Stand straight and calibrate (Gameplay settings, or F9).");
+            Logger.LogInfo("A full-body tracker is connected but not calibrated. Open the pause menu and choose Calibrate Body, or press F9.");
         }
     }
 
