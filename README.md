@@ -1,18 +1,14 @@
-# R.E.P.O. VR Mod
+# RepoXR FBT
 
-[![Thunderstore Version](https://img.shields.io/thunderstore/v/DaXcess/RepoXR?style=for-the-badge&logo=thunderstore&logoColor=white)](https://thunderstore.io/c/repo/p/DaXcess/RepoXR)
-[![GitHub Version](https://img.shields.io/github/v/release/DaXcess/RepoXR?style=for-the-badge&logo=github)](https://github.com/DaXcess/RepoXR/releases/latest)
-[![Thunderstore Downloads](https://img.shields.io/thunderstore/dt/DaXcess/RepoXR?style=for-the-badge&logo=thunderstore&logoColor=white)](https://thunderstore.io/c/repo/p/DaXcess/RepoXR)
-[![GitHub Downloads](https://img.shields.io/github/downloads/DaXcess/RepoXR/total?style=for-the-badge&logo=github)](https://github.com/DaXcess/RepoXR/releases/latest)
-<br />
-[![Release Build](https://img.shields.io/github/actions/workflow/status/DaXcess/RepoXR/build-release.yaml?branch=main&style=for-the-badge&label=RELEASE)](https://github.com/DaXcess/RepoXR/actions/workflows/build-release.yaml)
-[![Debug Build](https://img.shields.io/github/actions/workflow/status/DaXcess/RepoXR/build-debug.yaml?branch=dev&style=for-the-badge&label=DEBUG)](https://github.com/DaXcess/RepoXR/actions/workflows/build-debug.yaml)
+**RepoXR FBT** is a GPL-3.0 fork of [RepoXR by DaXcess](https://github.com/DaXcess/RepoXR) with optional 3-point full-body tracking. This repository is [Ashtonite365/RepoXR](https://github.com/Ashtonite365/RepoXR). It is not the official Thunderstore package [`DaXcess-RepoXR`](https://thunderstore.io/c/repo/p/DaXcess/RepoXR). Do not install both plugins in the same BepInEx folder.
 
-**RepoXR** is a fully fledged R.E.P.O. VR mod that adds full 6-DoF motion controlled VR support to R.E.P.O.
+The BepInEx plugin id is `io.ashtonite.repoxr.fbt` (`RepoXR FBT`). It still builds `RepoXR.dll` / `RepoXR.Preload.dll` and uses the same `BepInEx/plugins/RepoXR` install layout, including the upstream runtime dependencies and asset bundle. Upstream's preload path is the one historically shipped as LCVR; keep that attribution when you redistribute a build.
+
+Original RepoXR is a fully fledged R.E.P.O. VR mod that adds full 6-DoF motion controlled VR support to R.E.P.O. Full-body tracking is off unless you enable it. Setup, SteamVR/SlimeVR roles, calibration, and who can see the extra bones are documented in [FBT.md](FBT.md).
 
 The mod is powered by Unity's OpenXR plugin and is thereby compatible with a wide range of headsets, controllers and runtimes, like Oculus, Virtual Desktop, SteamVR and many more!
 
-RepoXR is compatible with multiplayer and works in a lobby comprised of both flatscreen **and** VR players. Running this mod without having a VR headset will allow you to see the arm movements of any VR semibots in the same lobby, all while still being compatible with vanilla clients (even if the host is using no mods, though there is a small catch with that).
+RepoXR is compatible with multiplayer and works in a lobby comprised of both flatscreen **and** VR players. Running this mod without having a VR headset will allow you to see the arm movements of any VR semibots in the same lobby, all while still being compatible with vanilla clients (even if the host is using no mods, though there is a small catch with that). Tracker-driven hips and legs are visible to other people running **this fork**. Vanilla clients and official RepoXR builds keep the normal leg animation. Details are in [FBT.md](FBT.md).
 
 ### Discord Server
 
@@ -26,19 +22,16 @@ At the time of writing, no explicit compatibility exists yet for RepoXR, so you 
 
 # Installing and using the mod
 
-It is recommended to use a mod launcher like Gale to easily download and install the mod. You can download Gale [here](https://kesomannen.com/gale). This mod can be found on thunderstore under the name [RepoXR](https://thunderstore.io/c/repo/p/DaXcess/RepoXR). You can also install the mod by manually downloading it in combination with BepInEx.
-
-Running the mod using Gale can be done simply by clicking "Launch game", which will automagically launch the game with the installed mods.
-
-For more information on using the mod, check out the [RepoXR Thunderstore page](https://thunderstore.io/c/repo/p/DaXcess/RepoXR).
+The original mod is on Thunderstore as [DaXcess/RepoXR](https://thunderstore.io/c/repo/p/DaXcess/RepoXR) and can be installed with a launcher such as [Gale](https://kesomannen.com/gale). This fork is not that listing. Build it from source ([COMPILING.md](COMPILING.md)) and replace `RepoXR.dll` (and `RepoXR.Preload.dll` if you rebuilt the patcher) inside an existing RepoXR install. Remove the official plugin DLL first so both copies are not loaded.
 
 # Versions
 
 Here is a list of RepoXR versions and which version(s) of R.E.P.O. it supports
 
-| RepoXR | R.E.P.O. Version |
-|--------|------------------|
-| v1.2.3 | v0.4.4           |
+| RepoXR FBT | R.E.P.O. Version |
+|------------|------------------|
+| v1.3.0 (this fork, adds 3-point FBT) | v0.4.4 |
+| v1.2.3 (upstream baseline) | v0.4.4 |
 | v1.2.2 | v0.4.3           |
 | v1.2.1 | v0.4.3           |
 | v1.2.0 | v0.4.3           |

@@ -18,9 +18,10 @@ namespace RepoXR;
 [BepInPlugin(PLUGIN_GUID, PLUGIN_NAME, PLUGIN_VERSION)]
 public class Plugin : BaseUnityPlugin
 {
-    public const string PLUGIN_GUID = "io.daxcess.repoxr";
-    public const string PLUGIN_NAME = "RepoXR";
-    public const string PLUGIN_VERSION = "1.2.3";
+    // Distinct from official io.daxcess.repoxr so this fork is not the Thunderstore package identity.
+    public const string PLUGIN_GUID = "io.ashtonite.repoxr.fbt";
+    public const string PLUGIN_NAME = "RepoXR FBT";
+    public const string PLUGIN_VERSION = "1.3.0";
 
     public const string SUPPORTED_GAME_VERSION = "v0.4.4";
 
@@ -47,7 +48,8 @@ public class Plugin : BaseUnityPlugin
             LoadDebugSymbols();
 #endif
 
-        Logger.LogInfo($"Starting {PLUGIN_NAME} v{PLUGIN_VERSION} ({GetCommitHash()})");
+        Logger.LogInfo(
+            $"Starting {PLUGIN_NAME} v{PLUGIN_VERSION} ({GetCommitHash()}). FBT fork of DaXcess/RepoXR (GPL-3.0); not the official Thunderstore package.");
 
         // Allow disabling VR via config and command line
         var disableVr = Config.DisableVR.Value ||

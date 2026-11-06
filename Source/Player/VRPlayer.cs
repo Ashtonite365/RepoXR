@@ -120,6 +120,9 @@ public class VRPlayer : MonoBehaviour
         networkPlayer = gameObject.AddComponent<NetworkPlayer>();
         networkPlayer.playerAvatar = localController.playerAvatarScript;
 
+        var bodyTracking = gameObject.AddComponent<FullBodyTracking>();
+        bodyTracking.Initialize(mainCamera.parent ? mainCamera.parent : mainCamera);
+
         Actions.Instance["ResetHeight"].performed += OnResetHeight;
     }
 

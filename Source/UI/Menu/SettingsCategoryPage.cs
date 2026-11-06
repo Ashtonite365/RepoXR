@@ -3,6 +3,7 @@ using System.Reflection;
 using BepInEx.Configuration;
 using HarmonyLib;
 using RepoXR.Assets;
+using RepoXR.Player.Body;
 using RepoXR.UI.Settings;
 using TMPro;
 using UnityEngine;
@@ -68,6 +69,30 @@ public class SettingsCategoryPage : MonoBehaviour
                 slider.stringAtEndOfValue = descriptor.Percentage ? "%" : descriptor.Suffix;
                 slider.buttonSegmentJump = descriptor.StepSize;
                 slider.pointerSegmentJump = descriptor.PointerSize;
+
+                var trackerOptions = slider.customOptions;
+                if (property.GetCustomAttribute<TrackerPickerAttribute>() != null && trackerOptions != null)
+                {
+                    ViveTrackers.Poll();
+                    trackerOptions.Add(new FloatMenuSlider.CustomOption { customOptionText = "Auto" });
+
+                    foreach (var tracker in ViveTrackers.Catalog)
+                    {
+                        trackerOptions.Add(new FloatMenuSlider.CustomOption
+                        {
+                            customOptionText = tracker.MenuLabel
+                        });
+                    }
+
+                    slider.hasCustomOptions = true;
+                    slider.currentValue = Mathf.Clamp((int)val.BoxedValue, 0, Mathf.Max(0, trackerOptions.Count - 1));
+                    slider.isInteger = true;
+                    slider.hasBar = false;
+                    slider.wrapAround = true;
+
+                    positionOffset -= 30f;
+                    continue;
+                }
 
                 if (val.SettingType.IsEnum)
                 {
