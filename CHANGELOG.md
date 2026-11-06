@@ -1,3 +1,9 @@
+# 1.3.2 (RepoXR FBT fork)
+
+**Fixes**:
+- R.E.P.O. v0.5.1 (Unity 6000.3) can finish OpenXR startup. The bundled OpenXR 1.10 player plugin calls `OpenXRAnalytics.SendInitializeEvent` after the headset session is created, and that method needs `UnityEngine.Analytics.AnalyticsResult`, which this player no longer contains. The resulting `TypeLoadException` tore the session down and left SteamVR in theater mode. Those analytics methods are emptied in `RuntimeDeps/Unity.XR.OpenXR.dll` before the assembly loads. Full-body tracking is unchanged and still off by default.
+- A JSON Addressables catalog no longer risks aborting mod startup. Unity 6 rejects `catalog_0.1.json` (binary catalogs only). Localization strings for the tutorial stay on the desktop wording; headset and controller VR do not depend on that catalog.
+
 # 1.3.1 (RepoXR FBT fork)
 
 **Changes**:

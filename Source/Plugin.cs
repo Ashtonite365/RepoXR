@@ -21,7 +21,7 @@ public class Plugin : BaseUnityPlugin
     // Distinct from official io.daxcess.repoxr so this fork is not the Thunderstore package identity.
     public const string PLUGIN_GUID = "io.ashtonite.repoxr.fbt";
     public const string PLUGIN_NAME = "RepoXR FBT";
-    public const string PLUGIN_VERSION = "1.3.1";
+    public const string PLUGIN_VERSION = "1.3.2";
 
     public const string SUPPORTED_GAME_VERSION = "v0.4.4";
 
@@ -112,7 +112,23 @@ public class Plugin : BaseUnityPlugin
     {
         try
         {
-            var deps = Path.Combine(Path.GetDirectoryName(Info.Location)!, "RuntimeDeps");
+            var pluginDirectory = Path.GetDirectoryName(Info.Location)!;
+            var deps = Path.Combine(pluginDirectory, "RuntimeDeps");
+
+            foreach (var result in OpenXrPlayerFix.Apply(new[]
+                     {
+                         Path.Combine(deps, "Unity.XR.OpenXR.dll"),
+                         Path.Combine(pluginDirectory, "Unity.XR.OpenXR.dll")
+                     }))
+            {
+                if (result.Error != null)
+                    Logger.LogWarning($"Could not bypass OpenXR analytics in {result.Path}: {result.Error}");
+                else if (result.MethodsNeutralized > 0)
+                    Logger.LogInfo(
+                        $"Bypassed OpenXR analytics in {result.Path} ({result.MethodsNeutralized} methods). VR startup no longer depends on UnityEngine.Analytics.AnalyticsResult.");
+                else
+                    Logger.LogInfo($"OpenXR analytics bypass is already in place ({result.Path}).");
+            }
 
             foreach (var file in Directory.GetFiles(deps, "*.dll"))
             {

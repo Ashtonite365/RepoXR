@@ -389,8 +389,19 @@ internal static class OpenXR
                 Environment.SetEnvironmentVariable("XR_RUNTIME_JSON", null);
             }
 
-            xrGeneralSettings.InitXRSDK();
-            xrGeneralSettings.Start();
+            try
+            {
+                xrGeneralSettings.InitXRSDK();
+                xrGeneralSettings.Start();
+            }
+            catch (Exception ex)
+            {
+                // Initialize() catches the success-path analytics failure and then calls it
+                // again outside the try. That second throw used to escape Awake, so the
+                // universal patches never applied and the game stayed a desktop window.
+                Logger.LogError($"OpenXR initialization threw {ex.GetType().Name}: {ex.Message}");
+                return false;
+            }
 
             var displays = new List<XRDisplaySubsystem>();
             SubsystemManager.GetInstances(displays);
