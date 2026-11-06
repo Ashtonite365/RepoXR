@@ -21,7 +21,7 @@ public class Plugin : BaseUnityPlugin
     // Distinct from official io.daxcess.repoxr so this fork is not the Thunderstore package identity.
     public const string PLUGIN_GUID = "io.ashtonite.repoxr.fbt";
     public const string PLUGIN_NAME = "RepoXR FBT";
-    public const string PLUGIN_VERSION = "1.3.6";
+    public const string PLUGIN_VERSION = "1.3.7";
 
     public const string SUPPORTED_GAME_VERSION = "v0.5.1";
 
@@ -75,7 +75,10 @@ public class Plugin : BaseUnityPlugin
             return;
         }
 
-        if (launchVr && InitializeVR())
+        if (launchVr)
+            launchVr = OpenXrRuntimeConnected();
+
+        if (launchVr && InitializeVR(pendingRuntime))
             Flags |= Flags.VR;
 
         HarmonyPatcher.PatchUniversal();
@@ -160,11 +163,50 @@ public class Plugin : BaseUnityPlugin
         return true;
     }
 
-    private static bool InitializeVR()
+    static OpenXR.Runtime? pendingRuntime;
+
+    /// <summary>
+    /// VR was requested. Start OpenXR only when SteamVR is actually running, or another
+    /// runtime can already see a headset. Otherwise stay on the desktop path with one
+    /// info line and do not call the Unity loader.
+    /// </summary>
+    static bool OpenXrRuntimeConnected()
+    {
+        OpenXrSessionProbe.SessionDecision decision;
+        try
+        {
+            var candidates = OpenXrSessionProbe.FromRuntimes(OpenXR.GetRuntimes());
+            decision = OpenXrSessionProbe.Decide(candidates, OpenXrSessionProbe.SteamVrHostRunning(),
+                OpenXrSessionProbe.HeadsetSessionAvailable);
+        }
+        catch (Exception ex)
+        {
+            RepoXR.Logger.LogDebug($"OpenXR runtime probe failed: {ex.Message}");
+            decision = OpenXrSessionProbe.SteamVrHostRunning()
+                ? new OpenXrSessionProbe.SessionDecision(true, false, "", "")
+                : new OpenXrSessionProbe.SessionDecision(false, false, "", "");
+        }
+
+        if (!decision.StartOpenXr)
+        {
+            pendingRuntime = null;
+            RepoXR.Logger.LogInfo(OpenXrSessionProbe.NotConnectedMessage);
+            return false;
+        }
+
+        pendingRuntime = decision.OnlyThisRuntime
+            ? new OpenXR.Runtime { Name = decision.RuntimeName, Path = decision.RuntimeJson }
+            : null;
+        return true;
+    }
+
+    private static bool InitializeVR(OpenXR.Runtime? onlyRuntime)
     {
         RepoXR.Logger.LogInfo("Loading VR...");
 
-        if (!OpenXR.Loader.InitializeXR())
+        if (onlyRuntime is { } runtime
+                ? !OpenXR.Loader.InitializeRuntime(runtime)
+                : !OpenXR.Loader.InitializeXR())
         {
             RepoXR.Logger.LogError("Failed to start in VR Mode! Only Non-VR features are available!");
             RepoXR.Logger.LogError("Make sure your headset is turned on and connected before starting the game.");

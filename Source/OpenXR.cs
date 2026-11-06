@@ -309,22 +309,15 @@ internal static class OpenXR
             BepInEx.Logging.Logger.Sources.Add(Logger);
         }
 
+        public static bool InitializeRuntime(Runtime runtime)
+        {
+            return PrepareLoader() && InitializeXR(runtime);
+        }
+
         public static bool InitializeXR()
         {
-            InitializeScripts();
-
-            // Check if Unity's OpenXR subsystem is available
-            var subsystems = new List<ISubsystemDescriptor>();
-            SubsystemManager.GetAllSubsystemDescriptors(subsystems);
-
-            if (!(subsystems.Any(subsystem => subsystem.id == "OpenXR Input") &&
-                  subsystems.Any(subsystem => subsystem.id == "OpenXR Display")))
-            {
-                Logger.LogError(
-                    "No Unity OpenXR subsystem found, this installation of RepoXR was not installed correctly.");
-
+            if (!PrepareLoader())
                 return false;
-            }
 
             // Cannot override runtime if high integrity: https://github.com/KhronosGroup/OpenXR-SDK-Source/blob/main/src/common/platform_utils.hpp#L317
             if (Native.IsHighIntegrityLevel())
@@ -370,6 +363,23 @@ internal static class OpenXR
                     return true;
 
             Logger.LogError("All available runtimes were attempted, but none worked. Aborting...");
+            return false;
+        }
+
+        static bool PrepareLoader()
+        {
+            InitializeScripts();
+
+            // Check if Unity's OpenXR subsystem is available
+            var subsystems = new List<ISubsystemDescriptor>();
+            SubsystemManager.GetAllSubsystemDescriptors(subsystems);
+
+            if (subsystems.Any(subsystem => subsystem.id == "OpenXR Input") &&
+                subsystems.Any(subsystem => subsystem.id == "OpenXR Display"))
+                return true;
+
+            Logger.LogError(
+                "No Unity OpenXR subsystem found, this installation of RepoXR was not installed correctly.");
             return false;
         }
 

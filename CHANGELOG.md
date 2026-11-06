@@ -1,3 +1,8 @@
+# 1.3.7 (RepoXR FBT fork)
+
+**Fixes**:
+- `--repoxr-vr` (and the other VR launch signals) no longer starts OpenXR when no runtime is actually up. SteamVR is used only while `vrserver` / `vrmonitor` / `vrcompositor` (or the other SteamVR host processes) are running. Any other installed runtime is asked, outside Unity, whether a headset system exists. If none does, startup logs one info line and stays non-VR, so the OpenXR loader does not print `xrCreateInstance` / "all runtimes were attempted". A desktop launch with no VR flag is unchanged. A running SteamVR host, or another runtime that can already see a headset, still starts OpenXR.
+
 # 1.3.6 (RepoXR FBT fork)
 
 **Fixes**:
