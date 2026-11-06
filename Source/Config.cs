@@ -2,6 +2,8 @@
 using BepInEx.Configuration;
 using RepoXR.Assets;
 using RepoXR.Managers;
+using RepoXR.Player;
+using RepoXR.Player.Body;
 using RepoXR.Player.Camera;
 using UnityEngine;
 using UnityEngine.XR;
@@ -57,6 +59,47 @@ public class Config(string assemblyPath, ConfigFile file)
     [ConfigDescriptor(customName: "Eye Tracking", trueText: "Enabled", falseText: "Disabled")]
     public ConfigEntry<bool> EnableEyeTracking { get; } = file.Create("Gameplay", nameof(EnableEyeTracking), true,
         "If supported by the headset, use eye tracking to move your characters pupils for other players and for checking line of sight with enemies.");
+
+    [ConfigDescriptor(customName: "Full Body Tracking", trueText: "Enabled", falseText: "Disabled")]
+    public ConfigEntry<bool> EnableFullBodyTracking { get; } = file.Create("Gameplay", nameof(EnableFullBodyTracking),
+        false,
+        "Optional 3-point body tracking from extra SteamVR, Vive, or SlimeVR trackers. Off by default, and ignored when those trackers are not connected. Turning this on requires a game restart before the trackers are bound. Headset and controller VR is unchanged while this is off.");
+
+    [ConfigDescriptor(customName: "Body Slot 1")]
+    public ConfigEntry<BodyRole> FbtSlot1Role { get; } = file.Create("Gameplay", nameof(FbtSlot1Role), BodyRole.Waist,
+        new ConfigDescription(
+            "Body part driven by full-body slot 1. Only these three slots can be active. Defaults to waist, left foot, and right foot.",
+            new AcceptableValueEnum<BodyRole>()));
+
+    [ConfigDescriptor(customName: "Slot 1 Tracker")]
+    [TrackerPicker]
+    public ConfigEntry<int> FbtSlot1Device { get; } = file.Create("Gameplay", nameof(FbtSlot1Device), 0,
+        "Tracker for slot 1. 0 matches the SteamVR role to the body part (Auto). Other values pick a discovered tracker in the VR settings list.");
+
+    [ConfigDescriptor(customName: "Body Slot 2")]
+    public ConfigEntry<BodyRole> FbtSlot2Role { get; } = file.Create("Gameplay", nameof(FbtSlot2Role), BodyRole.LeftFoot,
+        new ConfigDescription("Body part driven by full-body slot 2.",
+            new AcceptableValueEnum<BodyRole>()));
+
+    [ConfigDescriptor(customName: "Slot 2 Tracker")]
+    [TrackerPicker]
+    public ConfigEntry<int> FbtSlot2Device { get; } = file.Create("Gameplay", nameof(FbtSlot2Device), 0,
+        "Tracker for slot 2. 0 matches the SteamVR role to the body part (Auto).");
+
+    [ConfigDescriptor(customName: "Body Slot 3")]
+    public ConfigEntry<BodyRole> FbtSlot3Role { get; } = file.Create("Gameplay", nameof(FbtSlot3Role),
+        BodyRole.RightFoot,
+        new ConfigDescription("Body part driven by full-body slot 3.",
+            new AcceptableValueEnum<BodyRole>()));
+
+    [ConfigDescriptor(customName: "Slot 3 Tracker")]
+    [TrackerPicker]
+    public ConfigEntry<int> FbtSlot3Device { get; } = file.Create("Gameplay", nameof(FbtSlot3Device), 0,
+        "Tracker for slot 3. 0 matches the SteamVR role to the body part (Auto).");
+
+    [ConfigDescriptor(customName: "Calibrate Full Body", trueText: "Now", falseText: "Idle")]
+    public ConfigEntry<bool> FbtCalibrate { get; } = file.Create("Gameplay", nameof(FbtCalibrate), false,
+        "Stand straight with your feet under you, then set this to Now (or press F9). The mod stores the tracker-to-body offset and switches this back to Idle.");
 
     // UI configuration
 
@@ -160,6 +203,14 @@ public class Config(string assemblyPath, ConfigFile file)
     public ConfigEntry<string> OpenXRRuntimeFile { get; } = file.Create("Internal", nameof(OpenXRRuntimeFile), "",
         "FOR INTERNAL USE ONLY, DO NOT EDIT");
 
+    public ConfigEntry<string> FbtCalibrationData { get; } = file.Create("Internal", nameof(FbtCalibrationData), "",
+        "FOR INTERNAL USE ONLY, DO NOT EDIT");
+
+    public ConfigEntry<string> FbtDeviceCatalog { get; } = file.Create("Internal", nameof(FbtDeviceCatalog), "",
+        "FOR INTERNAL USE ONLY, DO NOT EDIT");
+
+    bool suppressFbtCalibrate;
+
     /// <summary>
     /// Create persistent callbacks that persist for the entire duration of the application
     /// </summary>
@@ -195,6 +246,17 @@ public class Config(string assemblyPath, ConfigFile file)
             OpenXRSettings.Instance.renderMode = SinglePassRendering.Value
                 ?  OpenXRSettings.RenderMode.SinglePassInstanced
                 : OpenXRSettings.RenderMode.MultiPass;
+        };
+
+        FbtCalibrate.SettingChanged += (_, _) =>
+        {
+            if (suppressFbtCalibrate || !FbtCalibrate.Value)
+                return;
+
+            suppressFbtCalibrate = true;
+            FbtCalibrate.Value = false;
+            suppressFbtCalibrate = false;
+            FullBodyTracking.RequestCalibration();
         };
     }
 

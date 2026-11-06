@@ -1,4 +1,6 @@
 ﻿using System;
+using RepoXR.Player;
+using RepoXR.Player.Body;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -45,6 +47,8 @@ public class NetworkPlayer : MonoBehaviour
 
     // Other properties
     public bool VehicleHeadForward { get; private set; }
+
+    internal readonly BodyPose[] BodyPoses = new BodyPose[FullBodyTracking.SlotCount];
 
     private void Start()
     {
@@ -125,6 +129,8 @@ public class NetworkPlayer : MonoBehaviour
 
         playerRightArm.physGrabBeam.PhysGrabPointOrigin.SetParent(isLeftHanded ? leftHandAnchor : rightHandAnchor);
         playerRightArm.physGrabBeam.PhysGrabPointOrigin.localPosition = Vector3.zero;
+
+        gameObject.AddComponent<RemoteBodyApplier>().Bind(this);
 
         networkReady = true;
     }
@@ -303,5 +309,41 @@ public class NetworkPlayer : MonoBehaviour
     public void UpdateVehicleHeadForwardRPC(bool headForward)
     {
         VehicleHeadForward = headForward;
+    }
+
+    // One method per slot so the frame dedupe keeps all three poses.
+    // Vanilla clients never read this stream tail. Older RepoXR builds ignore unknown RPC hashes.
+
+    [XRRpc]
+    public void UpdateBodySlot0RPC(int role, Vector3 position, Quaternion rotation, bool active)
+    {
+        SetBodyPose(0, role, position, rotation, active);
+    }
+
+    [XRRpc]
+    public void UpdateBodySlot1RPC(int role, Vector3 position, Quaternion rotation, bool active)
+    {
+        SetBodyPose(1, role, position, rotation, active);
+    }
+
+    [XRRpc]
+    public void UpdateBodySlot2RPC(int role, Vector3 position, Quaternion rotation, bool active)
+    {
+        SetBodyPose(2, role, position, rotation, active);
+    }
+
+    void SetBodyPose(int slot, int role, Vector3 position, Quaternion rotation, bool active)
+    {
+        if (slot < 0 || slot >= BodyPoses.Length)
+            return;
+
+        var bodyRole = Enum.IsDefined(typeof(BodyRole), role) ? (BodyRole)role : BodyRole.Unused;
+        BodyPoses[slot] = new BodyPose
+        {
+            Role = bodyRole,
+            Position = position,
+            Rotation = rotation,
+            Active = active && bodyRole != BodyRole.Unused
+        };
     }
 }

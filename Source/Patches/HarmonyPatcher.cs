@@ -17,8 +17,8 @@ namespace RepoXR.Patches;
 
 internal static class HarmonyPatcher
 {
-    private static readonly Harmony VRPatcher = new("io.daxcess.repoxr");
-    private static readonly Harmony UniversalPatcher = new("io.daxcess.repoxr-universal");
+    private static readonly Harmony VRPatcher = new("io.ashtonite.repoxr.fbt");
+    private static readonly Harmony UniversalPatcher = new("io.ashtonite.repoxr.fbt-universal");
 
     private static bool ignoreErrors;
 
@@ -68,7 +68,7 @@ internal static class HarmonyPatcher
 
                 var result = Native.ShellMessageBox(IntPtr.Zero, IntPtr.Zero,
                     $"One or more patches failed to apply correctly.\n\nThis version of RepoXR may not be compatible with this version of the game ({Plugin.GameVersion}),\nor other installed mods may be interfering with RepoXR.\n\nDo you want to continue loading the mod anyway? (NOT RECOMMENDED!)\n\nPressing 'No' will close the game.",
-                    $"RepoXR v{Plugin.PLUGIN_VERSION} for R.E.P.O. {Plugin.SUPPORTED_GAME_VERSION}", 16 | 4 | 0x00010000);
+                    $"{Plugin.PLUGIN_NAME} v{Plugin.PLUGIN_VERSION} for R.E.P.O. {Plugin.SUPPORTED_GAME_VERSION}", 16 | 4 | 0x00010000);
 
                 switch (result)
                 {

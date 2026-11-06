@@ -9,11 +9,13 @@ using BepInEx.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RepoXR.Assets;
+using RepoXR.Player.Body;
 using Steamworks;
 using UnityEngine;
 using UnityEngine.XR;
 using UnityEngine.XR.Management;
 using UnityEngine.XR.OpenXR;
+using UnityEngine.XR.OpenXR.Features;
 
 namespace RepoXR;
 
@@ -423,7 +425,16 @@ internal static class OpenXR
                 ? OpenXRSettings.RenderMode.SinglePassInstanced
                 : OpenXRSettings.RenderMode.MultiPass;
             OpenXRSettings.Instance.depthSubmissionMode = OpenXRSettings.DepthSubmissionMode.None;
-            OpenXRSettings.Instance.features = AssetCollection.OpenXRFeatures.Features.ToArray();
+
+            var features = new List<OpenXRFeature>(AssetCollection.OpenXRFeatures.Features);
+            if (Plugin.Config.EnableFullBodyTracking.Value)
+            {
+                // Additive Vive/SlimeVR tracker profile. Omitted when FBT is off so controller bindings stay untouched.
+                features.Add(ViveTrackerFeature.CreateInjected());
+                Logger.LogInfo("Full body tracking is enabled. Binding up to three Vive/SteamVR/SlimeVR trackers.");
+            }
+
+            OpenXRSettings.Instance.features = features.ToArray();
         }
     }
 }

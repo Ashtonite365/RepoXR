@@ -1,19 +1,19 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <Description>Collecting Valuables in VR</Description>
-        <Version>1.2.3</Version>
-        <Authors>DaXcess</Authors>
+        <Description>R.E.P.O. VR mod. Fork of RepoXR by DaXcess (GPL-3.0) with optional 3-point full-body tracking.</Description>
+        <Version>1.3.0</Version>
+        <Authors>DaXcess; Ashtonite365</Authors>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <LangVersion>latest</LangVersion>
         <Title>RepoXR</Title>
-        <Copyright>Copyright (c) DaXcess 2026</Copyright>
-        <PackageProjectUrl>https://github.com/DaXcess/RepoXR</PackageProjectUrl>
-        <RepositoryUrl>https://github.com/DaXcess/RepoXR</RepositoryUrl>
+        <Copyright>Copyright (c) DaXcess 2026. Full-body tracking fork Copyright (c) Ashtonite365 2026.</Copyright>
+        <PackageProjectUrl>https://github.com/Ashtonite365/RepoXR</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/Ashtonite365/RepoXR</RepositoryUrl>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageLicenseFile>LICENSE</PackageLicenseFile>
         <Nullable>enable</Nullable>
-        <PackageId>RepoXR</PackageId>
+        <PackageId>RepoXR.FBT</PackageId>
         <RootNamespace>RepoXR</RootNamespace>
         <TargetFramework>netstandard2.1</TargetFramework>
     </PropertyGroup>

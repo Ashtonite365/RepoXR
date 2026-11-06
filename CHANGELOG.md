@@ -1,3 +1,16 @@
+# 1.3.0 (RepoXR FBT fork)
+
+This build is Ashtonite365's fork of DaXcess/RepoXR. It is not the official Thunderstore package.
+
+**Additions**:
+- Optional 3-slot full-body tracking from SteamVR, Vive, and SlimeVR trackers (waist, left foot, and right foot by default; chest or unused as alternatives)
+- Gameplay settings to enable tracking, map each slot to a tracker, and calibrate while standing straight (F9 does the same)
+- Body pose sync for other players who have this fork installed, on the existing RepoXR Photon stream
+
+**Notes**:
+- Full-body tracking is off by default and needs a restart after you enable it so the Vive tracker OpenXR profile can load
+- Vanilla clients and official RepoXR builds keep working. They do not show the tracker-driven hips and legs. See FBT.md
+
 # 1.2.3
 
 **Changes**:
