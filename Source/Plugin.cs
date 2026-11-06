@@ -21,9 +21,9 @@ public class Plugin : BaseUnityPlugin
     // Distinct from official io.daxcess.repoxr so this fork is not the Thunderstore package identity.
     public const string PLUGIN_GUID = "io.ashtonite.repoxr.fbt";
     public const string PLUGIN_NAME = "RepoXR FBT";
-    public const string PLUGIN_VERSION = "1.3.4";
+    public const string PLUGIN_VERSION = "1.3.5";
 
-    public const string SUPPORTED_GAME_VERSION = "v0.4.4";
+    public const string SUPPORTED_GAME_VERSION = "v0.5.1";
 
     public new static Config Config { get; private set; } = null!;
     public static Flags Flags { get; private set; } = 0;
@@ -58,6 +58,11 @@ public class Plugin : BaseUnityPlugin
         if (disableVr)
             Logger.LogWarning("VR has been disabled by config or the `--disable-vr` command line flag");
 
+        var launchVr = !disableVr && VrLaunch.ShouldAttemptOpenXr();
+        if (!disableVr && !launchVr)
+            Logger.LogInfo(
+                "Desktop launch. OpenXR was not started. Start R.E.P.O. from the SteamVR dashboard, or add the Steam launch option --repoxr-vr, to play with a headset.");
+
         if (!PreloadRuntimeDependencies())
         {
             Logger.LogError("Disabling mod because required runtime dependencies could not be loaded!");
@@ -70,7 +75,7 @@ public class Plugin : BaseUnityPlugin
             return;
         }
 
-        if (!disableVr && InitializeVR())
+        if (launchVr && InitializeVR())
             Flags |= Flags.VR;
 
         HarmonyPatcher.PatchUniversal();

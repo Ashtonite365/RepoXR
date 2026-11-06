@@ -1,3 +1,9 @@
+# 1.3.5 (RepoXR FBT fork)
+
+**Fixes**:
+- The compatibility popup now says R.E.P.O. v0.5.1. `PhysGrabber.GrabStateClimb` is left on the game's own climb rotation. The 0.5.1 instructions around `Quaternion.Angle` are not the 0.4.4 sequence, and rewriting them made unverifiable IL that failed the whole universal grabber patch class.
+- A desktop Steam launch does not enumerate OpenXR. Headset VR still starts when the game is launched from SteamVR, with `-vr` / `--repoxr-vr`, or with `VR_LAUNCH`, `VR_OVERRIDE`, or `REPOXR_VR`.
+
 # 1.3.4 (RepoXR FBT fork)
 
 **Fixes**:

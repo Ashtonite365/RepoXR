@@ -197,18 +197,17 @@ internal static class PhysGrabberUniversalPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> ObjectTurningPatches(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            // Replace camera transform with hand transform (local player)
-            .MatchForward(false,
-                new CodeMatch(OpCodes.Callvirt,
-                    Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform))))
-            .Set(OpCodes.Call, PlayerLocalCameraExtensions.GetHandOverrideTransformMethod)
-            // Replace camera transform with hand transform (remote player)
-            .MatchForward(false,
-                new CodeMatch(OpCodes.Callvirt,
-                    Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform))))
-            .Set(OpCodes.Call, PlayerLocalCameraExtensions.GetHandOverrideTransformMethod)
-            .InstructionEnumeration();
+        return GameSignatures.EditOrOriginal(instructions, "PhysGrabber turning hand aim", matcher =>
+        {
+            var replacement = PlayerLocalCameraExtensions.GetHandOverrideTransformMethod;
+            var match = new CodeMatch(OpCodes.Callvirt,
+                Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform)));
+            matcher.MatchForward(false, match);
+            if (matcher.IsInvalid)
+                throw new InvalidOperationException("GetOverrideTransform was not called");
+
+            return matcher.Repeat(hit => hit.Set(OpCodes.Call, replacement));
+        });
     }
 
     /// <summary>
@@ -218,43 +217,29 @@ internal static class PhysGrabberUniversalPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> GrabFromHandPatch(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            // Replace camera transform with hand transform
-            .MatchForward(false,
+        return GameSignatures.EditOrOriginal(instructions, "PhysGrabber grab-from-hand", matcher =>
+        {
+            matcher.MatchForward(false,
                 new CodeMatch(OpCodes.Callvirt,
-                    Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform))))
-            .Set(OpCodes.Call, PlayerLocalCameraExtensions.GetHandOverrideTransformMethod)
-            .InstructionEnumeration();
+                    Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform))));
+            if (matcher.IsInvalid)
+                throw new InvalidOperationException("GetOverrideTransform was not called");
+
+            return matcher.Set(OpCodes.Call, PlayerLocalCameraExtensions.GetHandOverrideTransformMethod);
+        });
     }
 
     /// <summary>
-    /// Make our tumble climb follow our hand rotation instead of the camera rotation
+    /// 0.5.1 still calls Quaternion.Angle, but the instructions around that call are not the
+    /// 0.4.4 sequence. Rewriting them produced unverifiable IL (GrabStateClimb call 0x0000f1)
+    /// and failed this whole patch class. Climb keeps the game's own rotation.
     /// </summary>
     [HarmonyPatch(typeof(PhysGrabber), nameof(PhysGrabber.GrabStateClimb))]
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> HandBasedTumbleClimbPatch(IEnumerable<CodeInstruction> instructions)
     {
-        return GameSignatures.EditOrOriginal(instructions, "PhysGrabber tumble climb", matcher => matcher
-            .MatchForward(false,
-                new CodeMatch(OpCodes.Call,
-                    Method(typeof(Quaternion), nameof(Quaternion.Angle), [typeof(Quaternion), typeof(Quaternion)])))
-            .Advance(-5)
-            .SetAndAdvance(OpCodes.Call, ((Func<PhysGrabber, Quaternion>)GetRotation).Method)
-            .RemoveInstruction());
-
-        static Quaternion GetRotation(PhysGrabber grabber)
-        {
-            if (grabber.playerAvatar.isLocal)
-                return VRSession.InVR
-                    ? VRSession.Instance.Player.MainHand.rotation * Quaternion.Euler(0, 180, 0)
-                    : grabber.climbStickTransform.rotation;
-
-            if (!NetworkSystem.instance)
-                return grabber.climbStickTransform.rotation;
-
-            return NetworkSystem.instance.GetNetworkPlayer(grabber.playerAvatar, out var networkPlayer)
-                ? networkPlayer.PrimaryHand.rotation * Quaternion.Euler(0, 180, 0)
-                : grabber.climbStickTransform.rotation;
-        }
+        Logger.LogInfo(
+            "Leaving PhysGrabber.GrabStateClimb unchanged. The 0.5.1 method body does not match the hand-rotation edit.");
+        return instructions;
     }
 }
