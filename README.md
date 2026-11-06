@@ -30,6 +30,7 @@ Here is a list of RepoXR versions and which version(s) of R.E.P.O. it supports
 
 | RepoXR FBT | R.E.P.O. Version |
 |------------|------------------|
+| v1.3.1 (pause-menu calibrate, live toggle) | v0.4.4 |
 | v1.3.0 (this fork, adds 3-point FBT) | v0.4.4 |
 | v1.2.3 (upstream baseline) | v0.4.4 |
 | v1.2.2 | v0.4.3           |

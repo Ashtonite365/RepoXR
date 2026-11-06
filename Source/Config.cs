@@ -63,7 +63,7 @@ public class Config(string assemblyPath, ConfigFile file)
     [ConfigDescriptor(customName: "Full Body Tracking", trueText: "Enabled", falseText: "Disabled")]
     public ConfigEntry<bool> EnableFullBodyTracking { get; } = file.Create("Gameplay", nameof(EnableFullBodyTracking),
         false,
-        "Optional 3-point body tracking from extra SteamVR, Vive, or SlimeVR trackers. Off by default, and ignored when those trackers are not connected. Turning this on requires a game restart before the trackers are bound. Headset and controller VR is unchanged while this is off.");
+        "Optional 3-point body tracking from extra SteamVR, Vive, or SlimeVR trackers. Off by default. The tracker profile is registered at startup, so this can be changed in the pause menu during a session. While off, tracker poses are not applied. Headset and controller VR keeps working.");
 
     [ConfigDescriptor(customName: "Body Slot 1")]
     public ConfigEntry<BodyRole> FbtSlot1Role { get; } = file.Create("Gameplay", nameof(FbtSlot1Role), BodyRole.Waist,
@@ -99,7 +99,7 @@ public class Config(string assemblyPath, ConfigFile file)
 
     [ConfigDescriptor(customName: "Calibrate Full Body", trueText: "Now", falseText: "Idle")]
     public ConfigEntry<bool> FbtCalibrate { get; } = file.Create("Gameplay", nameof(FbtCalibrate), false,
-        "Stand straight with your feet under you, then set this to Now (or press F9). The mod stores the tracker-to-body offset and switches this back to Idle.");
+        "Opens the in-game T-pose calibration preview. Confirm it by pressing both controller triggers. F9 opens the same preview, or confirms it if it is already open.");
 
     // UI configuration
 

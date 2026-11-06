@@ -427,12 +427,12 @@ internal static class OpenXR
             OpenXRSettings.Instance.depthSubmissionMode = OpenXRSettings.DepthSubmissionMode.None;
 
             var features = new List<OpenXRFeature>(AssetCollection.OpenXRFeatures.Features);
-            if (Plugin.Config.EnableFullBodyTracking.Value)
-            {
-                // Additive Vive/SlimeVR tracker profile. Omitted when FBT is off so controller bindings stay untouched.
-                features.Add(ViveTrackerFeature.CreateInjected());
-                Logger.LogInfo("Full body tracking is enabled. Binding up to three Vive/SteamVR/SlimeVR trackers.");
-            }
+            // OpenXR interaction profiles cannot be added after the session starts.
+            // Register the additive tracker profile up front so the pause-menu switch
+            // only enables or disables applying poses. Controllers keep their own profile.
+            features.Add(ViveTrackerFeature.CreateInjected());
+            Logger.LogInfo(
+                "Vive tracker profile registered. Full body tracking can be turned on or off from the pause menu without restarting.");
 
             OpenXRSettings.Instance.features = features.ToArray();
         }
