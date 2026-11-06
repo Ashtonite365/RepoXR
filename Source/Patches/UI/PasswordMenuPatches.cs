@@ -29,10 +29,18 @@ internal static class PasswordMenuPatches
     {
         __instance.GetComponent<PasswordUI>().OnConfirm();
     }
+}
 
-    /// <summary>
-    /// Fix the cursor position in VR
-    /// </summary>
+/// <summary>
+/// 0.5.x removed PasswordTextSet. Skip this cursor fix instead of failing the password menu patches.
+/// </summary>
+[RepoXRPatch]
+internal static class PasswordTextCursorPatches
+{
+    [HarmonyPrepare]
+    static bool Prepare() =>
+        AccessTools.DeclaredMethod(typeof(MenuPagePassword), nameof(MenuPagePassword.PasswordTextSet)) != null;
+
     [HarmonyPatch(typeof(MenuPagePassword), nameof(MenuPagePassword.PasswordTextSet))]
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> TextCursorPatch(IEnumerable<CodeInstruction> instructions)

@@ -4,6 +4,7 @@ using System.Reflection.Emit;
 using HarmonyLib;
 using Photon.Pun;
 using RepoXR.Managers;
+using RepoXR.Patches;
 using RepoXR.Networking;
 using RepoXR.Player;
 using UnityEngine;
@@ -114,12 +115,18 @@ internal static class MapToolPatches
     private static IEnumerable<CodeInstruction> NoShakePatch(IEnumerable<CodeInstruction> instructions)
     {
         return new CodeMatcher(instructions)
-            .MatchForward(false, new CodeMatch(OpCodes.Callvirt, Method(typeof(CameraShake), nameof(CameraShake.Shake))))
-            .Repeat(matcher => matcher
-                .Advance(-4)
-                .SetOpcodeAndAdvance(OpCodes.Nop)
-                .RemoveInstructions(4)
-            )
+            .MatchForward(false, new CodeMatch(static instruction => GameSignatures.IsCameraShakeCall(instruction, out _)))
+            .Repeat(matcher =>
+            {
+                // The 0.4.4 call was two floats. 0.5.x added a rumble multiplier.
+                // The original removal nops one instruction before the instance/args/call
+                // and deletes that whole group. Width stays argument count + 2.
+                GameSignatures.IsCameraShakeCall(matcher.Instruction, out var argumentCount);
+                var width = argumentCount + 2;
+                matcher.Advance(-width)
+                    .SetOpcodeAndAdvance(OpCodes.Nop)
+                    .RemoveInstructions(width);
+            })
             .InstructionEnumeration();
     }
 }

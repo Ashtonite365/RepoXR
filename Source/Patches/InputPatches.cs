@@ -254,12 +254,27 @@ internal static class InputPatches
     /// <summary>
     /// Use our own <see cref="VRInputSystem.InputToggleGet"/> since we might have other bindings not present in the base game
     /// </summary>
-    [HarmonyPatch(typeof(InputManager), nameof(InputManager.InputToggleGet))]
+    [HarmonyPatch(typeof(InputManager), nameof(InputManager.InputToggleGet), typeof(InputKey))]
     [HarmonyPrefix]
     private static bool InputToggleGet(ref InputKey key, ref bool __result)
     {
-        __result = VRInputSystem.Instance.InputToggleGet(key.ToString());
+        return ApplyInputToggle(key, ref __result);
+    }
 
+    /// <summary>
+    /// 0.5.x added InputToggleGet(InputKey, string scheme). It has to be named
+    /// separately or Harmony throws AmbiguousMatchException.
+    /// </summary>
+    [HarmonyPatch(typeof(InputManager), nameof(InputManager.InputToggleGet), typeof(InputKey), typeof(string))]
+    [HarmonyPrefix]
+    private static bool InputToggleGetWithScheme(ref InputKey key, ref bool __result)
+    {
+        return ApplyInputToggle(key, ref __result);
+    }
+
+    static bool ApplyInputToggle(InputKey key, ref bool result)
+    {
+        result = VRInputSystem.Instance.InputToggleGet(key.ToString());
         return false;
     }
 

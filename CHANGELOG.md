@@ -1,3 +1,8 @@
+# 1.3.3 (RepoXR FBT fork)
+
+**Fixes**:
+- The "patches failed to apply" popup on R.E.P.O. v0.5.1. `CameraShake.Shake` now has `Shake(float, float)` and `Shake(float, float, float rumbleMultiplier)`, and the old name-only Harmony patch threw `AmbiguousMatchException`. Both overloads are patched. The same kind of unqualified match is pinned down for `InputToggleGet`, `UIMousePosToUIPos`, `UIMouseGetLocalPositionWithinRectTransform`, and `CameraAim.AimTargetSoftSet`. Menu pages removed in 0.5.x (`MenuPageSavesRename`, the server-list text pages, `PasswordTextSet`) are skipped instead of failing the rest of their patch class.
+
 # 1.3.2 (RepoXR FBT fork)
 
 **Fixes**:
