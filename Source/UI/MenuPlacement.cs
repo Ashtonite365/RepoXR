@@ -184,77 +184,88 @@ internal static class MenuPlacement
         anchorName = "";
         truckPosition = standPosition = left = place = default;
         alongLeft = 0f;
-        var truck = FindTruck();
-        if (truck == null)
+        standPosition = camera.transform.position;
+        var viewRight = camera.transform.right;
+        viewRight.y = 0f;
+        var flatLeft = MenuTarget.CameraViewLeft(viewRight.x, viewRight.z);
+        left = new Vector3(flatLeft.x, flatLeft.y, flatLeft.z);
+        if (!TryVisibleTruck(camera, out anchorName, out var body))
             return false;
 
-        anchorName = truck.name;
-        truckPosition = truck.position;
-        standPosition = SceneStand(camera.transform);
-        var flatLeft = MenuTarget.PlayerLeft(standPosition.x, standPosition.z, truckPosition.x, truckPosition.z);
-        left = new Vector3(flatLeft.x, flatLeft.y, flatLeft.z);
-        var gap = TruckRadius(truck) + WidthMeters * 0.5f + 1.2f;
+        truckPosition = body.center;
+        var reach = ExtentAlong(body, left);
+        var gap = reach + WidthMeters * 0.5f + 0.5f;
         var spot = MenuTarget.LeftOfTruck(truckPosition.x, truckPosition.z, left.x, left.z, gap, standPosition.y);
         place = new Vector3(spot.x, spot.y, spot.z);
         alongLeft = Vector3.Dot(place - truckPosition, left);
         return true;
     }
 
-    static Transform? FindTruck()
+    static bool TryVisibleTruck(Camera camera, out string anchorName, out Bounds body)
     {
+        var label = "";
+        var found = new Bounds();
+        var any = false;
+        var forward = camera.transform.forward;
+        var origin = camera.transform.position;
+
+        void Take(Renderer renderer, string group)
+        {
+            if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy)
+                return;
+            var bounds = renderer.bounds;
+            if (bounds.size.sqrMagnitude < 0.25f)
+                return;
+            var ahead = MenuTarget.Ahead(origin.x, origin.z, forward.x, forward.z, bounds.center.x, bounds.center.z);
+            if (!MenuTarget.InFrontOfCamera(ahead, 40f))
+                return;
+
+            if (!any)
+            {
+                found = bounds;
+                label = group;
+                any = true;
+            }
+            else
+                found.Encapsulate(bounds);
+        }
+
         var animated = UnityEngine.Object.FindObjectOfType<TruckMenuAnimated>();
         if (animated != null)
-            return animated.transform;
-
-        Transform? best = null;
-        var bestSize = 0f;
-        foreach (var renderer in UnityEngine.Object.FindObjectsOfType<Renderer>())
         {
-            if (renderer == null || renderer.name.IndexOf("truck", StringComparison.OrdinalIgnoreCase) < 0 &&
-                (renderer.transform.parent == null ||
-                 renderer.transform.parent.name.IndexOf("truck", StringComparison.OrdinalIgnoreCase) < 0))
-                continue;
-
-            var size = renderer.bounds.size.sqrMagnitude;
-            if (size <= bestSize)
-                continue;
-
-            bestSize = size;
-            best = renderer.transform.parent != null &&
-                   renderer.transform.parent.name.IndexOf("truck", StringComparison.OrdinalIgnoreCase) >= 0
-                ? renderer.transform.parent
-                : renderer.transform;
+            foreach (var renderer in animated.GetComponentsInChildren<Renderer>())
+                Take(renderer, animated.name + " mesh");
         }
 
-        return best;
+        if (!any)
+        {
+            foreach (var renderer in UnityEngine.Object.FindObjectsOfType<Renderer>())
+            {
+                if (renderer == null)
+                    continue;
+                var parentName = renderer.transform.parent != null ? renderer.transform.parent.name : "";
+                if (renderer.name.IndexOf("truck", StringComparison.OrdinalIgnoreCase) < 0 &&
+                    parentName.IndexOf("truck", StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+                Take(renderer, "truck mesh");
+            }
+        }
+
+        if (!any && animated != null)
+            Logger.LogInfo(
+                "Menu plane was not placed. '" + animated.name + "' is at " + Format(animated.transform.position) +
+                " and none of its renderers are in front of the camera.");
+
+        anchorName = label;
+        body = found;
+        return any;
     }
 
-    static float TruckRadius(Transform truck)
+    static float ExtentAlong(Bounds bounds, Vector3 direction)
     {
-        var radius = 2f;
-        foreach (var renderer in truck.GetComponentsInChildren<Renderer>())
-        {
-            if (renderer == null)
-                continue;
-            var extent = renderer.bounds.extents.magnitude;
-            if (extent > radius)
-                radius = extent;
-        }
-
-        return radius;
-    }
-
-    static Vector3 SceneStand(Transform camera)
-    {
-        var stand = camera;
-        var cursor = camera;
-        while (cursor.parent != null && Vector3.Distance(cursor.parent.position, camera.position) < 8f)
-        {
-            cursor = cursor.parent;
-            stand = cursor;
-        }
-
-        return stand.position;
+        return bounds.extents.x * Mathf.Abs(direction.x)
+               + bounds.extents.y * Mathf.Abs(direction.y)
+               + bounds.extents.z * Mathf.Abs(direction.z);
     }
 
     static void ReleaseDesktopMirror(Canvas menuCanvas)

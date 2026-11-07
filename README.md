@@ -30,6 +30,7 @@ Here is a list of RepoXR versions and which version(s) of R.E.P.O. it supports
 
 | RepoXR FBT | R.E.P.O. Version |
 |------------|------------------|
+| v1.3.19 (menu plane is left of the truck in the camera's view) | v0.5.1 |
 | v1.3.18 (menu plane stays left of the truck) | v0.5.1 |
 | v1.3.17 (game menu drawn on a fixed plane) | v0.5.1 |
 | v1.3.16 (stationary game menu; cursor follows the controller plane) | v0.5.1 |

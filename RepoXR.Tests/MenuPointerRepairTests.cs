@@ -149,7 +149,7 @@ public class MenuPointerRepairTests
         var mid = RepoXR.UI.MenuTarget.LocalFromUv(0.5f, 0.5f, 0f, 0f, 712f, 400f);
         Assert.Equal(356f, mid.x, 3);
         Assert.Equal(200f, mid.y, 3);
-        var left = RepoXR.UI.MenuTarget.PlayerLeft(0f, 0f, 0f, 4f);
+        var left = RepoXR.UI.MenuTarget.CameraViewLeft(1f, 0f);
         Assert.Equal(-1f, left.x, 3);
         Assert.Equal(0f, left.z, 3);
         var spot = RepoXR.UI.MenuTarget.LeftOfTruck(2f, 5f, left.x, left.z, 4f, 1.8f);
@@ -158,6 +158,11 @@ public class MenuPointerRepairTests
         Assert.Equal(5f, spot.z, 3);
         Assert.True(RepoXR.UI.MenuTarget.IsLeftOfTruck(4f));
         Assert.False(RepoXR.UI.MenuTarget.IsLeftOfTruck(0f));
+        var behind = RepoXR.UI.MenuTarget.Ahead(0f, 2f, 0f, 1f, -20f, -8f);
+        Assert.True(behind < 0f);
+        Assert.False(RepoXR.UI.MenuTarget.InFrontOfCamera(behind, 40f));
+        var ahead = RepoXR.UI.MenuTarget.Ahead(0f, 2f, 0f, 1f, 1f, 8f);
+        Assert.True(RepoXR.UI.MenuTarget.InFrontOfCamera(ahead, 40f));
     }
 
     public static float Axis() => 1f;

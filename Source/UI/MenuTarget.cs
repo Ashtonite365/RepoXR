@@ -73,18 +73,17 @@ internal static class MenuTarget
     }
 
     /// <summary>
-    /// Horizontal left when standing at <paramref name="stand"/> and facing the truck.
-    /// Independent of headset yaw. Facing +Z yields -X.
+    /// Horizontal left of the camera's view. <paramref name="rightX"/> and <paramref name="rightZ"/>
+    /// are the camera's right vector with vertical removed. Looking along +Z, right is +X, so left is -X.
+    /// This is not the truck's local left.
     /// </summary>
-    internal static (float x, float y, float z) PlayerLeft(float standX, float standZ, float truckX, float truckZ)
+    internal static (float x, float y, float z) CameraViewLeft(float rightX, float rightZ)
     {
-        var fx = truckX - standX;
-        var fz = truckZ - standZ;
-        var mag = MathF.Sqrt(fx * fx + fz * fz);
+        var mag = MathF.Sqrt(rightX * rightX + rightZ * rightZ);
         if (mag < 0.01f)
             return (-1f, 0f, 0f);
 
-        return (-fz / mag, 0f, fx / mag);
+        return (-rightX / mag, 0f, -rightZ / mag);
     }
 
     internal static (float x, float y, float z) LeftOfTruck(float truckX, float truckZ, float leftX, float leftZ,
@@ -92,4 +91,9 @@ internal static class MenuTarget
         (truckX + leftX * gap, eyeY, truckZ + leftZ * gap);
 
     internal static bool IsLeftOfTruck(float alongLeft) => alongLeft > 0.25f;
+
+    internal static float Ahead(float camX, float camZ, float fwdX, float fwdZ, float pointX, float pointZ) =>
+        (pointX - camX) * fwdX + (pointZ - camZ) * fwdZ;
+
+    internal static bool InFrontOfCamera(float ahead, float maxDistance) => ahead > 1f && ahead < maxDistance;
 }

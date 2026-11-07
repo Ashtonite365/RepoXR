@@ -95,8 +95,8 @@ public class MainMenu : MonoBehaviour
             {
                 if (!page.gameObject.activeSelf)
                     page.gameObject.SetActive(true);
-                MenuPlacement.Present(page);
-                yield break;
+                if (MenuPlacement.Present(page))
+                    yield break;
             }
 
             elapsed += Time.unscaledDeltaTime;

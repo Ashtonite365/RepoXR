@@ -23,7 +23,7 @@ public class Plugin : BaseUnityPlugin
     // Distinct from official io.daxcess.repoxr so this fork is not the Thunderstore package identity.
     public const string PLUGIN_GUID = "io.ashtonite.repoxr.fbt";
     public const string PLUGIN_NAME = "RepoFBT";
-    public const string PLUGIN_VERSION = "1.3.18";
+    public const string PLUGIN_VERSION = "1.3.19";
 
     public const string SUPPORTED_GAME_VERSION = "v0.5.1";
 

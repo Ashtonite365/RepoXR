@@ -1,3 +1,8 @@
+# 1.3.19 (RepoFBT)
+
+**Fixes**:
+- 1.3.18 anchored the plane to `CONTROLLER` at `(-20, 0.5, 0)` and stood at `(0, 0, 0)`, so the plane landed at `(-20, 0, -8.424)`, behind the camera and on the floor (`planeInView=False`). That root is not the truck in front of the camera. The plane now uses only renderers in front of the camera, within 40 m, and sits just to the camera's left of those meshes at the camera's height. The pose is taken once and then left in the world. The truck and the camera are not moved.
+
 # 1.3.18 (RepoFBT)
 
 **Fixes**:
