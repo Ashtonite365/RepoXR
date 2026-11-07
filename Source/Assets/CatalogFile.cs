@@ -22,7 +22,23 @@ internal static class CatalogFile
 
     internal static bool SameLoadedBundle(string path, string loadedName)
     {
-        var name = path ?? "";
+        var name = Stem(path);
+        var loaded = Stem(loadedName);
+        if (string.Equals(name, loaded, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Addressables keeps one group name and writes a different _<32 hex> on each build.
+        // defaultlocalgroup_assets_all_<hashA> and defaultlocalgroup_assets_all_<hashB> are the same files.
+        var nameGroup = GroupOf(name);
+        var loadedGroup = GroupOf(loaded);
+        return nameGroup.Length > 0
+               && string.Equals(nameGroup, loadedGroup, StringComparison.OrdinalIgnoreCase)
+               && (HasHash(name) || HasHash(loaded));
+    }
+
+    static string Stem(string value)
+    {
+        var name = value ?? "";
         var slash = Math.Max(name.LastIndexOf('/'), name.LastIndexOf('\\'));
         if (slash >= 0)
             name = name[(slash + 1)..];
@@ -31,20 +47,23 @@ internal static class CatalogFile
         if (name.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
             name = name[..^extension.Length];
 
-        if (string.Equals(name, loadedName ?? "", StringComparison.OrdinalIgnoreCase))
-            return true;
+        return name;
+    }
 
-        // Addressables writes the group name into the bundle, then appends _<32 hex> on disk.
-        // A second file for that same group must be reused, not loaded again.
-        if (string.IsNullOrEmpty(loadedName) ||
-            !name.StartsWith(loadedName + "_", StringComparison.OrdinalIgnoreCase))
+    internal static string GroupOf(string name)
+    {
+        if (string.IsNullOrEmpty(name) || !HasHash(name))
+            return name ?? "";
+
+        return name[..^33];
+    }
+
+    static bool HasHash(string name)
+    {
+        if (string.IsNullOrEmpty(name) || name.Length < 33 || name[^33] != '_')
             return false;
 
-        var suffix = name[(loadedName.Length + 1)..];
-        if (suffix.Length != 32)
-            return false;
-
-        foreach (var character in suffix)
+        foreach (var character in name[^32..])
         {
             if (!Uri.IsHexDigit(character))
                 return false;

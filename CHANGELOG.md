@@ -1,3 +1,9 @@
+# 1.3.13 (RepoXR FBT fork)
+
+**Fixes**:
+- The 14:15 1.3.12 log reaches `Leave to Main Menu`, `Menu controller pointer is ready.`, and `Menu cursor is following the controller ray.` with no setup exception. That shows the ray met the menu canvas. It does not show the canvas was in front of the headset. `XROrigin.Camera` is no longer assigned, because that setter reparents `Camera Main` under the floor offset. If enabling the origin still moves or deactivates that camera, the game parent and local pose are put back. One line, `Menu view:`, records canvas active/enabled/position/scale, camera pose and parent chain, whether the canvas center is in the camera view, and whether `MenuPageMain` is active.
+- A second `defaultlocalgroup_assets_all_<other hash>.bundle` is the same group as `..._644635e9bfc6a9f81b1adcaf94351997.bundle`. 1.3.12 only reused a bundle whose name was the group or the same hash, so `LoadFromFile` still ran and Unity logged the duplicate. Opening a localization file now logs the bundle names already in memory.
+
 # 1.3.12 (RepoXR FBT fork)
 
 **Fixes**:

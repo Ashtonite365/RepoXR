@@ -18,6 +18,7 @@ internal static class AssetCollection
     private static AssetBundle assetBundle;
     static readonly Dictionary<string, LocalizedAsset> localizedByKey = new();
     static readonly List<AssetBundle> openedBundles = new();
+    static readonly List<string> openedBundleFiles = new();
     static bool localizationIndexed;
     internal static bool LocalizationCatalogFailed { get; private set; }
 
@@ -229,7 +230,27 @@ internal static class AssetCollection
                 return loaded;
         }
 
+        foreach (var opened in openedBundleFiles)
+        {
+            if (!CatalogFile.SameLoadedBundle(path, opened))
+                continue;
+
+            Logger.LogInfo(
+                $"Localization bundle {System.IO.Path.GetFileName(path)} was not loaded again. {System.IO.Path.GetFileName(opened)} is already open for that group.");
+            return null;
+        }
+
+        var openNames = new List<string>();
+        foreach (var loaded in openedBundles)
+        {
+            if (loaded != null && !string.IsNullOrEmpty(loaded.name))
+                openNames.Add(loaded.name);
+        }
+
+        Logger.LogInfo(
+            $"Opening localization bundle {System.IO.Path.GetFileName(path)}. Already loaded: {(openNames.Count == 0 ? "(none)" : string.Join(", ", openNames))}.");
         var bundle = AssetBundle.LoadFromFile(path);
+        openedBundleFiles.Add(path);
         if (bundle != null)
             openedBundles.Add(bundle);
         return bundle;

@@ -99,6 +99,24 @@ public class MenuPointerRepairTests
         Assert.False(RepoXR.Assets.CatalogFile.SameLoadedBundle(
             @"C:\RepoXR\Addressables\localization-assets-shared_644635e9bfc6a9f81b1adcaf94351997.bundle",
             "defaultlocalgroup_assets_all"));
+        Assert.True(RepoXR.Assets.CatalogFile.SameLoadedBundle(
+            @"C:\RepoXR\Addressables\defaultlocalgroup_assets_all_644635e9bfc6a9f81b1adcaf94351997.bundle",
+            @"C:\RepoXR\Addressables\defaultlocalgroup_assets_all_3495734bfc6a9f81b1adcaf943519970.bundle"));
+        Assert.False(RepoXR.Assets.CatalogFile.SameLoadedBundle(
+            @"C:\RepoXR\Addressables\defaultlocalgroup_assets_all_644635e9bfc6a9f81b1adcaf94351997.bundle",
+            "repoxrassets"));
+    }
+
+    [Fact]
+    public void The_menu_camera_stays_put_when_its_parent_and_active_state_match()
+    {
+        Assert.True(RepoXR.UI.MenuView.CameraStayed("Rig:shown", "Rig:shown", true, true));
+        Assert.False(RepoXR.UI.MenuView.CameraStayed(
+            "Rig:shown", "Camera Floor Offset:shown / XR Origin:shown / Rig:shown", true, true));
+        Assert.False(RepoXR.UI.MenuView.CameraStayed("Rig:shown", "Rig:shown", true, false));
+        Assert.True(RepoXR.UI.MenuView.CenterInView(0.5f, 0.4f, 2f));
+        Assert.False(RepoXR.UI.MenuView.CenterInView(0.5f, 0.4f, -1f));
+        Assert.False(RepoXR.UI.MenuView.CenterInView(1.4f, 0.4f, 2f));
     }
 
     public static float Axis() => 1f;

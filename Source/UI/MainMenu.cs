@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
 using RepoXR.Input;
 using RepoXR.Player.Camera;
 using UnityEngine;
@@ -140,22 +142,99 @@ public class MainMenu : MonoBehaviour
             floor = floorObject.transform;
         }
 
+        var cameraParent = mainCamera.transform.parent;
+        var cameraLocalPosition = mainCamera.transform.localPosition;
+        var cameraLocalRotation = mainCamera.transform.localRotation;
+        var cameraActive = mainCamera.gameObject.activeSelf;
+        var parentBefore = Chain(cameraParent);
+
         var origin = host.GetComponent<XROrigin>();
         if (origin == null)
             origin = host.AddComponent<XROrigin>();
+        // Origin and the floor object have to be set before the component awakens.
+        // Assigning Camera makes XR Origin reparent Camera Main under the floor offset.
+        // That is the game camera the menu was framed on, so it stays where the game put it.
         origin.Origin = rig;
         origin.CameraFloorOffsetObject = floor.gameObject;
         host.SetActive(true);
-        origin.Camera = mainCamera;
+
+        var parentAfter = Chain(mainCamera.transform.parent);
+        var cameraMoved = !MenuView.CameraStayed(parentBefore, parentAfter, cameraActive,
+            mainCamera.gameObject.activeSelf);
+        if (cameraMoved && cameraParent != null)
+        {
+            mainCamera.transform.SetParent(cameraParent, false);
+            mainCamera.transform.localPosition = cameraLocalPosition;
+            mainCamera.transform.localRotation = cameraLocalRotation;
+            if (cameraActive)
+                mainCamera.gameObject.SetActive(true);
+            Logger.LogWarning(
+                $"XR Origin changed Camera Main ({parentBefore} -> {parentAfter}). Restored the game camera parent so the menu stays on it.");
+            parentAfter = Chain(mainCamera.transform.parent);
+        }
 
         if (mainCanvas != null)
             mainCanvas.worldCamera = mainCamera;
+
+        LogMenuView(parentAfter);
 
         if (host.GetComponent<XRRayInteractorManager>() != null)
             return;
 
         host.AddComponent<XRRayInteractorManager>();
     }
+
+    void LogMenuView(string cameraParents)
+    {
+        var canvas = mainCanvas;
+        var camera = mainCamera;
+        if (canvas == null || camera == null)
+        {
+            Logger.LogInfo("Menu view: canvas or camera was missing after setup.");
+            return;
+        }
+
+        var center = camera.WorldToViewportPoint(canvas.transform.position);
+        var page = FindObjectOfType<MenuPageMain>(true);
+        var inView = MenuView.CenterInView(center.x, center.y, center.z);
+        Logger.LogInfo(
+            "Menu view: canvas '" + canvas.name +
+            "' active=" + canvas.gameObject.activeInHierarchy +
+            " enabled=" + canvas.enabled +
+            " mode=" + canvas.renderMode +
+            " pos=" + Format(canvas.transform.position) +
+            " scale=" + Format(canvas.transform.lossyScale) +
+            " parents=[" + Chain(canvas.transform) +
+            "] camera '" + camera.name +
+            "' active=" + camera.gameObject.activeInHierarchy +
+            " enabled=" + camera.enabled +
+            " pos=" + Format(camera.transform.position) +
+            " fwd=" + Format(camera.transform.forward) +
+            " parents=[" + cameraParents +
+            "] viewport=" + Format(center) +
+            " canvasCenterInView=" + inView +
+            " menuPage=" + (page == null
+                ? "missing"
+                : page.name + " active=" + page.gameObject.activeInHierarchy));
+    }
+
+    static string Chain(Transform node)
+    {
+        if (node == null)
+            return "(none)";
+
+        var parts = new List<string>();
+        for (var guard = 0; node != null && guard < 8; guard++)
+        {
+            parts.Add(node.name + ":" + (node.gameObject.activeInHierarchy ? "shown" : "hidden"));
+            node = node.parent;
+        }
+
+        return string.Join(" / ", parts);
+    }
+
+    static string Format(Vector3 value) =>
+        string.Format(CultureInfo.InvariantCulture, "({0:0.###},{1:0.###},{2:0.###})", value.x, value.y, value.z);
 
     private static IEnumerator LobbyLinkCopy()
     {

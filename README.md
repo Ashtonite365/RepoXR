@@ -30,6 +30,7 @@ Here is a list of RepoXR versions and which version(s) of R.E.P.O. it supports
 
 | RepoXR FBT | R.E.P.O. Version |
 |------------|------------------|
+| v1.3.13 (menu camera stays in the game hierarchy) | v0.5.1 |
 | v1.3.12 (menu cursor follows the controller ray) | v0.5.1 |
 | v1.3.11 (menu ray hits buttons; JSON catalog is not loaded) | v0.5.1 |
 | v1.3.10 (menu ray origin and catalog bundle reuse) | v0.5.1 |
