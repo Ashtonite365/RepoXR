@@ -16,7 +16,6 @@ namespace RepoXR.UI;
 public class MainMenu : MonoBehaviour
 {
     private Camera mainCamera;
-    private Canvas mainCanvas;
 
     private void Awake()
     {
@@ -37,8 +36,8 @@ public class MainMenu : MonoBehaviour
 
         RunStep("menu event system", DisableEventSystem);
         RunStep("menu camera", SetupMainCamera);
-        RunStep("menu canvas", SetupMainCanvas);
         RunStep("controller pointer", SetupControllers);
+        StartCoroutine(WaitForMenuPage());
 
         if (XRRayInteractorManager.Instance == null)
             Logger.LogWarning("Menu controller pointer was not created. The game cursor stays available.");
@@ -84,38 +83,27 @@ public class MainMenu : MonoBehaviour
         topCamera.targetTexture = null;
     }
 
-    private void SetupMainCanvas()
+    IEnumerator WaitForMenuPage()
     {
-        mainCanvas = HUDCanvas.instance.GetComponent<Canvas>();
-        mainCanvas.renderMode = RenderMode.WorldSpace;
-        mainCanvas.transform.position = new Vector3(-45, -0.75f, 6);
-        mainCanvas.transform.eulerAngles = new Vector3(0, 50, 0);
-        mainCanvas.transform.localScale = Vector3.one * 0.03f;
-        mainCanvas.transform.Find("HUD").gameObject.AddComponent<RectMask2D>();
-        
-        Destroy(mainCanvas.GetComponent<GraphicRaycaster>());
-        mainCanvas.gameObject.AddComponent<TrackedDeviceGraphicRaycaster>();
-        
-        // Remove game HUD elements
-        mainCanvas.transform.Find("HUD/Game Hud").gameObject.SetActive(false);
-        mainCanvas.transform.Find("HUD/Chat Local").gameObject.SetActive(false);
-        
-        // Set up chat
-        if (RunManager.instance.levelCurrent == RunManager.instance.levelLobbyMenu)
+        var elapsed = 0f;
+        while (elapsed < 8f)
         {
-            var chat = mainCanvas.transform.Find("HUD/Chat").GetComponent<RectTransform>();
-            chat.SetParent(mainCanvas.transform.Find("HUD"), false);
-        }
-        else
-            mainCanvas.transform.Find("HUD/Chat").gameObject.SetActive(false);
+            var page = MenuPageMain.instance != null
+                ? MenuPageMain.instance
+                : FindObjectOfType<MenuPageMain>(true);
+            if (page != null)
+            {
+                if (!page.gameObject.activeSelf)
+                    page.gameObject.SetActive(true);
+                MenuPlacement.Present(page);
+                yield break;
+            }
 
-        // Move top menu selection outline
-        var selection = FindObjectOfType<MenuSelectionBoxTop>(true);
-        if (selection != null)
-        {
-            var moved = selection.transform.parent.parent;
-            moved.SetParent(moved.parent.parent, true);
+            elapsed += Time.unscaledDeltaTime;
+            yield return null;
         }
+
+        Logger.LogInfo("MenuPageMain was still missing 8 seconds after setup. HUD Canvas was not moved.");
     }
 
     private void SetupControllers()
@@ -173,9 +161,6 @@ public class MainMenu : MonoBehaviour
             parentAfter = Chain(mainCamera.transform.parent);
         }
 
-        if (mainCanvas != null)
-            mainCanvas.worldCamera = mainCamera;
-
         LogMenuView(parentAfter);
 
         if (host.GetComponent<XRRayInteractorManager>() != null)
@@ -186,36 +171,25 @@ public class MainMenu : MonoBehaviour
 
     void LogMenuView(string cameraParents)
     {
-        var canvas = mainCanvas;
         var camera = mainCamera;
-        if (canvas == null || camera == null)
+        var hud = HUDCanvas.instance != null ? HUDCanvas.instance.GetComponent<Canvas>() : null;
+        var page = FindObjectOfType<MenuPageMain>(true);
+        if (camera == null || hud == null)
         {
-            Logger.LogInfo("Menu view: canvas or camera was missing after setup.");
+            Logger.LogInfo("Menu view: HUD Canvas or Camera Main was missing. HUD Canvas was not moved. menuPage=" +
+                           (page == null ? "missing" : page.name));
             return;
         }
 
-        var center = camera.WorldToViewportPoint(canvas.transform.position);
-        var page = FindObjectOfType<MenuPageMain>(true);
-        var inView = MenuView.CenterInView(center.x, center.y, center.z);
+        var center = camera.WorldToViewportPoint(hud.transform.position);
         Logger.LogInfo(
-            "Menu view: canvas '" + canvas.name +
-            "' active=" + canvas.gameObject.activeInHierarchy +
-            " enabled=" + canvas.enabled +
-            " mode=" + canvas.renderMode +
-            " pos=" + Format(canvas.transform.position) +
-            " scale=" + Format(canvas.transform.lossyScale) +
-            " parents=[" + Chain(canvas.transform) +
-            "] camera '" + camera.name +
-            "' active=" + camera.gameObject.activeInHierarchy +
-            " enabled=" + camera.enabled +
-            " pos=" + Format(camera.transform.position) +
-            " fwd=" + Format(camera.transform.forward) +
-            " parents=[" + cameraParents +
-            "] viewport=" + Format(center) +
-            " canvasCenterInView=" + inView +
-            " menuPage=" + (page == null
-                ? "missing"
-                : page.name + " active=" + page.gameObject.activeInHierarchy));
+            "Menu view: HUD Canvas left in place active=" + hud.gameObject.activeInHierarchy +
+            " enabled=" + hud.enabled +
+            " mode=" + hud.renderMode +
+            " pos=" + Format(hud.transform.position) +
+            " viewport=" + Format(center) +
+            " menuPage=" + (page == null ? "missing" : page.name + " active=" + page.gameObject.activeInHierarchy) +
+            " cameraParents=[" + cameraParents + "]. The menu canvas is chosen when MenuPageMain starts.");
     }
 
     static string Chain(Transform node)

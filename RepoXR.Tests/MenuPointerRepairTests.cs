@@ -119,6 +119,19 @@ public class MenuPointerRepairTests
         Assert.False(RepoXR.UI.MenuView.CenterInView(1.4f, 0.4f, 2f));
     }
 
+    [Fact]
+    public void The_main_menu_waits_for_its_page_and_does_not_claim_the_hud()
+    {
+        Assert.False(RepoXR.UI.MenuTarget.PageReady(false));
+        Assert.False(RepoXR.UI.MenuTarget.Accept(false, "HUD Canvas", true));
+        Assert.False(RepoXR.UI.MenuTarget.Accept(true, "HUD Canvas", false));
+        Assert.True(RepoXR.UI.MenuTarget.Accept(true, "HUD Canvas", true));
+        Assert.True(RepoXR.UI.MenuTarget.Accept(true, "Canvas", true));
+        Assert.True(RepoXR.UI.MenuTarget.IsHudCanvas("HUD Canvas"));
+        Assert.False(RepoXR.UI.MenuTarget.IsHudCanvas("Canvas"));
+        Assert.Equal(1.6f / 1920f, RepoXR.UI.MenuTarget.ScaleForWidth(1920f, 1.6f), 5);
+    }
+
     public static float Axis() => 1f;
 
     public static float ReadAxis(string name) => name.Length;

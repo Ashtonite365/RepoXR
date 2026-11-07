@@ -23,8 +23,8 @@ internal static class Entrypoint
         // We grab all these references manually as most of the instances aren't set yet
         // Since most of them run in the "Start" lifetime function
 
-        // Disable blocking UI
-        GameObject.Find("UI/UI/Canvas").GetComponent<Canvas>().enabled = false;
+        // UI/UI/Canvas is not HUD Canvas. 1.3.13 proved the main menu page was not
+        // on HUD Canvas yet, so this canvas stays enabled until that page resolves it.
 
         var canvas = GameObject.Find("UI/HUD/HUD Canvas").transform;
         var fade = canvas.Find("Fade");

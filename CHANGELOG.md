@@ -1,3 +1,8 @@
+# 1.3.14 (RepoXR FBT fork)
+
+**Fixes**:
+- The 14:25 VR line is `Menu view: canvas 'HUD Canvas' ... viewport=(5.336,0.569,-3.492) canvasCenterInView=False menuPage=missing`. That canvas is the game HUD, its center is behind Camera Main, and `MenuPageMain` did not exist one frame after setup. The camera parent was not restored because the origin did not move it. HUD Canvas is no longer moved to `(-45,-0.75,6)`. `UI/UI/Canvas` is no longer disabled at scene load. When `MenuPageMain` starts, or within 8 seconds of it existing, the canvas that page is under is placed in front of Camera Main. If the page never appears, HUD stays where the game left it and one line says so. The pointer aims at that menu canvas, not at the HUD.
+
 # 1.3.13 (RepoXR FBT fork)
 
 **Fixes**:

@@ -126,11 +126,11 @@ public class XRRayInteractorManager : MonoBehaviour
     {
         world = default;
         var (interactor, _) = GetActiveInteractor();
-        if (interactor == null || HUDCanvas.instance == null)
+        var canvas = MenuPlacement.Current;
+        if (interactor == null || canvas == null)
             return false;
 
-        var canvas = HUDCanvas.instance.GetComponent<RectTransform>();
-        return canvas != null && MenuRay.Hits(interactor.transform, canvas, out world);
+        return MenuRay.Hits(interactor.transform, canvas, out world);
     }
 
     public bool IsOver(RectTransform rect)

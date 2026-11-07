@@ -28,6 +28,7 @@ internal static class UIPatches
         __instance.transform.localPosition = Vector3.zero;
         __instance.waitTimer = 3;
         __instance.introDone = true;
+        MenuPlacement.Present(__instance);
     }
 
     /// <summary>
