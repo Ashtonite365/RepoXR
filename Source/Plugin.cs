@@ -23,7 +23,7 @@ public class Plugin : BaseUnityPlugin
     // Distinct from official io.daxcess.repoxr so this fork is not the Thunderstore package identity.
     public const string PLUGIN_GUID = "io.ashtonite.repoxr.fbt";
     public const string PLUGIN_NAME = "RepoXR FBT";
-    public const string PLUGIN_VERSION = "1.3.11";
+    public const string PLUGIN_VERSION = "1.3.12";
 
     public const string SUPPORTED_GAME_VERSION = "v0.5.1";
 
@@ -162,18 +162,21 @@ public class Plugin : BaseUnityPlugin
 
     public static string GetCommitHash()
     {
-        try
-        {
-            var attribute = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>();
-
-            return attribute?.InformationalVersion.Split('+')[1][..7] ?? "unknown";
-        }
-        catch
-        {
-            RepoXR.Logger.LogWarning("Failed to retrieve commit hash (compiled outside of git repo?).");
-
+        var version = Assembly.GetExecutingAssembly()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (string.IsNullOrEmpty(version))
             return "unknown";
-        }
+
+        var plus = version.LastIndexOf('+');
+        if (plus < 0 || plus >= version.Length - 1)
+            return "unknown";
+
+        var hash = version[(plus + 1)..];
+        var dirty = hash.IndexOf('-');
+        if (dirty >= 0)
+            hash = hash[..dirty];
+
+        return hash.Length >= 7 ? hash[..7] : hash;
     }
 
     private bool PreloadRuntimeDependencies()

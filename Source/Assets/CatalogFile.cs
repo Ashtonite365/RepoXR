@@ -31,6 +31,25 @@ internal static class CatalogFile
         if (name.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
             name = name[..^extension.Length];
 
-        return string.Equals(name, loadedName ?? "", StringComparison.OrdinalIgnoreCase);
+        if (string.Equals(name, loadedName ?? "", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Addressables writes the group name into the bundle, then appends _<32 hex> on disk.
+        // A second file for that same group must be reused, not loaded again.
+        if (string.IsNullOrEmpty(loadedName) ||
+            !name.StartsWith(loadedName + "_", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var suffix = name[(loadedName.Length + 1)..];
+        if (suffix.Length != 32)
+            return false;
+
+        foreach (var character in suffix)
+        {
+            if (!Uri.IsHexDigit(character))
+                return false;
+        }
+
+        return true;
     }
 }

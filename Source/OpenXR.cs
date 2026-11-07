@@ -448,12 +448,19 @@ internal static class OpenXR
             OpenXRSettings.Instance.depthSubmissionMode = OpenXRSettings.DepthSubmissionMode.None;
 
             var features = new List<OpenXRFeature>(AssetCollection.OpenXRFeatures.Features);
-            // OpenXR interaction profiles cannot be added after the session starts.
-            // Register the additive tracker profile up front so the pause-menu switch
-            // only enables or disables applying poses. Controllers keep their own profile.
-            features.Add(ViveTrackerFeature.CreateInjected());
-            Logger.LogInfo(
-                "Vive tracker profile registered. Full body tracking can be turned on or off from the pause menu without restarting.");
+            // Unity asks SteamVR for xrGetCurrentInteractionProfile on every registered
+            // tracker role. With no tracker bound, SteamVR returns XR_ERROR_PATH_UNSUPPORTED
+            // once per role (seven lines). Register the profile only when body tracking
+            // is already on. Controllers keep their own profile either way.
+            if (Plugin.Config.EnableFullBodyTracking.Value)
+            {
+                features.Add(ViveTrackerFeature.CreateInjected());
+                Logger.LogInfo(
+                    "Vive tracker profile registered because full-body tracking is on. A tracker role with no device can still make SteamVR return XR_ERROR_PATH_UNSUPPORTED from Unity's own profile query. Pose binding is separate, and headset controllers are unchanged.");
+            }
+            else
+                Logger.LogInfo(
+                    "Vive tracker profile was not registered. Full-body tracking is off, so SteamVR is not asked for tracker interaction profiles. Turn the option on before the next launch to use trackers.");
 
             OpenXRSettings.Instance.features = features.ToArray();
         }

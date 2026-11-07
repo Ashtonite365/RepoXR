@@ -1,3 +1,14 @@
+# 1.3.12 (RepoXR FBT fork)
+
+**Fixes**:
+- The menu cursor follows the controller ray. 1.3.11 left `MenuCursor.Update` on the mouse, so the visible cursor stayed put while the laser could still move. After that update, a ray that meets the menu canvas moves the cursor there and keeps it shown. A miss leaves the mouse position. The laser line is unchanged. The first time this happens the log says `Menu cursor is following the controller ray.`
+- `XROrigin` is configured while its object is inactive, then enabled. 1.3.11 assigned the floor offset after `AddComponent`, and `Awake` logged `No Camera Floor Offset GameObject specified` before that assignment.
+- UI reparenting uses `SetParent` instead of the `parent` property, which is what logged `Parent of RectTransform is being set with parent property` on the menu.
+- Field of view is not assigned on a stereo camera. Unity ignores that assignment and logs `Cannot set field of view on camera with name 'Camera Main' while VR is enabled.` Flat cameras still accept it.
+- A second `defaultlocalgroup_assets_all_<hash>.bundle` is reused when a loaded bundle already has that group name. 1.3.11 still called `LoadFromFile` on the hash file, which is the remaining duplicate-bundle error.
+- The Vive tracker profile is registered only when full-body tracking is on at launch. It adds seven role paths, and the 1.3.11 Player log has seven `xrGetCurrentInteractionProfile` `XR_ERROR_PATH_UNSUPPORTED` lines from Unity while that profile was registered. Turning body tracking on after a launch that did not register the profile takes effect on the next launch.
+- A build with no `+revision` in its version no longer logs a warning. The startup line still shows `(unknown)` in that case. Release builds stamp the git revision when git is available.
+
 # 1.3.11 (RepoXR FBT fork)
 
 **Fixes**:

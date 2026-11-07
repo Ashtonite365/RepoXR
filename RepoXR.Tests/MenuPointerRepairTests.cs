@@ -93,6 +93,12 @@ public class MenuPointerRepairTests
         Assert.True(RepoXR.Assets.CatalogFile.SameLoadedBundle(
             @"C:\RepoXR\Addressables\defaultlocalgroup_assets_all_644635e9bfc6a9f81b1adcaf94351997.bundle",
             "defaultlocalgroup_assets_all_644635e9bfc6a9f81b1adcaf94351997"));
+        Assert.True(RepoXR.Assets.CatalogFile.SameLoadedBundle(
+            @"C:\RepoXR\Addressables\defaultlocalgroup_assets_all_644635e9bfc6a9f81b1adcaf94351997.bundle",
+            "defaultlocalgroup_assets_all"));
+        Assert.False(RepoXR.Assets.CatalogFile.SameLoadedBundle(
+            @"C:\RepoXR\Addressables\localization-assets-shared_644635e9bfc6a9f81b1adcaf94351997.bundle",
+            "defaultlocalgroup_assets_all"));
     }
 
     public static float Axis() => 1f;

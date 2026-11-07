@@ -110,7 +110,10 @@ public class MainMenu : MonoBehaviour
         // Move top menu selection outline
         var selection = FindObjectOfType<MenuSelectionBoxTop>(true);
         if (selection != null)
-            selection.transform.parent.parent = selection.transform.parent.parent.parent;
+        {
+            var moved = selection.transform.parent.parent;
+            moved.SetParent(moved.parent.parent, true);
+        }
     }
 
     private void SetupControllers()
@@ -119,28 +122,39 @@ public class MainMenu : MonoBehaviour
             throw new InvalidOperationException("the VR camera rig is not ready");
 
         var rig = mainCamera.transform.parent.gameObject;
-        var floor = rig.transform.Find("Camera Floor Offset");
+        var host = rig.transform.Find("XR Origin")?.gameObject;
+        if (host == null)
+        {
+            host = new GameObject("XR Origin");
+            host.SetActive(false);
+            host.transform.SetParent(rig.transform, false);
+        }
+        else if (host.activeSelf)
+            host.SetActive(false);
+
+        var floor = host.transform.Find("Camera Floor Offset");
         if (floor == null)
         {
             var floorObject = new GameObject("Camera Floor Offset");
-            floorObject.transform.SetParent(rig.transform, false);
+            floorObject.transform.SetParent(host.transform, false);
             floor = floorObject.transform;
         }
 
-        var origin = rig.GetComponent<XROrigin>();
+        var origin = host.GetComponent<XROrigin>();
         if (origin == null)
-            origin = rig.AddComponent<XROrigin>();
+            origin = host.AddComponent<XROrigin>();
         origin.Origin = rig;
         origin.CameraFloorOffsetObject = floor.gameObject;
+        host.SetActive(true);
         origin.Camera = mainCamera;
 
         if (mainCanvas != null)
             mainCanvas.worldCamera = mainCamera;
 
-        if (rig.GetComponent<XRRayInteractorManager>() != null)
+        if (host.GetComponent<XRRayInteractorManager>() != null)
             return;
 
-        rig.AddComponent<XRRayInteractorManager>();
+        host.AddComponent<XRRayInteractorManager>();
     }
 
     private static IEnumerator LobbyLinkCopy()

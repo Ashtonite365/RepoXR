@@ -118,6 +118,21 @@ public class XRRayInteractorManager : MonoBehaviour
 
     static bool loggedMenuHit;
 
+    /// <summary>
+    /// World point where the active controller ray meets a world-space menu canvas.
+    /// The game menu cursor uses this. The laser line is left where it is.
+    /// </summary>
+    public bool TryAimPoint(out Vector3 world)
+    {
+        world = default;
+        var (interactor, _) = GetActiveInteractor();
+        if (interactor == null || HUDCanvas.instance == null)
+            return false;
+
+        var canvas = HUDCanvas.instance.GetComponent<RectTransform>();
+        return canvas != null && MenuRay.Hits(interactor.transform, canvas, out world);
+    }
+
     public bool IsOver(RectTransform rect)
     {
         if (rect == null || !TryHit(rect, out _))

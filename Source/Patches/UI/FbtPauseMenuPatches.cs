@@ -1,4 +1,5 @@
 using RepoXR.Player;
+using RepoXR.Player.Body;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -81,9 +82,11 @@ internal static class FbtPauseMenuPatches
     {
         var enabled = !Plugin.Config.EnableFullBodyTracking.Value;
         Plugin.Config.EnableFullBodyTracking.Value = enabled;
-        Logger.LogInfo(enabled
-            ? "Full body tracking on. Tracker poses will apply. Headset and controllers stay bound."
-            : "Full body tracking off. Tracker poses will not apply. Headset and controllers stay bound.");
+        Logger.LogInfo(!enabled
+            ? "Full body tracking off. Tracker poses will not apply. Headset and controllers stay bound."
+            : ViveTrackerFeature.Injected
+                ? "Full body tracking on. Tracker poses will apply. Headset and controllers stay bound."
+                : "Full body tracking on. The tracker profile was not registered this launch, so poses start after the next launch. Headset and controllers stay bound.");
     }
 
     static void OnCalibrate()

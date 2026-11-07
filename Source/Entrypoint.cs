@@ -91,32 +91,24 @@ internal static class Entrypoint
         loading.SetParent(loadingCanvas.transform, false);
 
         // Moon UI stuff
-        var moonMask = new GameObject("Moon Mask")
-        {
-            transform =
-            {
-                parent = loadingCanvas.transform,
-                localScale = Vector3.one,
-                localPosition = Vector3.zero,
-                localRotation = Quaternion.identity
-            }
-        }.AddComponent<RectMask2D>().GetComponent<RectTransform>();
+        var moonObject = new GameObject("Moon Mask");
+        moonObject.transform.SetParent(loadingCanvas.transform, false);
+        moonObject.transform.localScale = Vector3.one;
+        moonObject.transform.localPosition = Vector3.zero;
+        moonObject.transform.localRotation = Quaternion.identity;
+        var moonMask = moonObject.AddComponent<RectMask2D>().GetComponent<RectTransform>();
         moonMask.sizeDelta = new Vector2(800, 550);
 
         moon.SetParent(moonMask.transform, false);
         moon.localScale = Vector3.one * 0.8f;
 
         // Result screen stuff (Cosmetic tokens)
-        var resultMask = new GameObject("Result Mask")
-        {
-            transform =
-            {
-                parent = loadingCanvas.transform,
-                localScale = Vector3.one,
-                localPosition = Vector3.zero,
-                localRotation = Quaternion.identity
-            }
-        }.AddComponent<RectMask2D>().GetComponent<RectTransform>();
+        var resultObject = new GameObject("Result Mask");
+        resultObject.transform.SetParent(loadingCanvas.transform, false);
+        resultObject.transform.localScale = Vector3.one;
+        resultObject.transform.localPosition = Vector3.zero;
+        resultObject.transform.localRotation = Quaternion.identity;
+        var resultMask = resultObject.AddComponent<RectMask2D>().GetComponent<RectTransform>();
         resultMask.sizeDelta = new Vector2(720, 405);
 
         result.SetParent(resultMask.transform, false);

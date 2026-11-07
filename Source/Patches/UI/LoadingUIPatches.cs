@@ -27,15 +27,11 @@ internal static class LoadingUIPatches
     {
         __instance.stuckText.spriteAsset = AssetCollection.TMPInputsSpriteAsset;
 
-        var mask = new GameObject("Stuck Text Mask")
-        {
-            transform =
-            {
-                parent = __instance.transform,
-                localPosition = Vector3.zero,
-                localRotation = Quaternion.identity
-            }
-        }.AddComponent<RectMask2D>();
+        var maskObject = new GameObject("Stuck Text Mask");
+        maskObject.transform.SetParent(__instance.transform, false);
+        maskObject.transform.localPosition = Vector3.zero;
+        maskObject.transform.localRotation = Quaternion.identity;
+        var mask = maskObject.AddComponent<RectMask2D>();
         var maskTransform = mask.GetComponent<RectTransform>();
         var uiTransform = __instance.GetComponent<RectTransform>();
 

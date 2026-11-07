@@ -31,6 +31,35 @@ internal static class UIPatches
     }
 
     /// <summary>
+    /// The visible menu cursor is <see cref="MenuCursor"/>. Its Update writes the mouse
+    /// position after any earlier controller write. When the controller ray meets the
+    /// menu canvas, put the cursor there. A miss leaves the mouse position in place.
+    /// The laser line is not moved here.
+    /// </summary>
+    [HarmonyPatch(typeof(MenuCursor), nameof(MenuCursor.Update))]
+    [HarmonyPostfix]
+    private static void FollowControllerAim(MenuCursor __instance)
+    {
+        var manager = XRRayInteractorManager.Instance;
+        if (manager == null || !manager.TryAimPoint(out var world))
+            return;
+
+        var canvas = HUDCanvas.instance.GetComponent<RectTransform>();
+        __instance.transform.SetPositionAndRotation(world, canvas.rotation);
+        __instance.showTimer = 0.2f;
+        if (__instance.mesh != null)
+            __instance.mesh.SetActive(true);
+
+        if (loggedCursorFollow)
+            return;
+
+        loggedCursorFollow = true;
+        Logger.LogInfo("Menu cursor is following the controller ray.");
+    }
+
+    static bool loggedCursorFollow;
+
+    /// <summary>
     /// Disable UI detection code if the <see cref="XRRayInteractorManager"/> is not yet present
     /// </summary>
     [HarmonyPatch(typeof(SemiFunc), nameof(SemiFunc.UIMouseHover))]

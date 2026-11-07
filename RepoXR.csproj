@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <Description>R.E.P.O. VR mod. Fork of RepoXR by DaXcess (GPL-3.0) with optional 3-point full-body tracking.</Description>
-        <Version>1.3.11</Version>
+        <Version>1.3.12</Version>
         <Authors>DaXcess; Ashtonite365</Authors>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <LangVersion>latest</LangVersion>
@@ -88,6 +88,15 @@
       <None Remove="RepoXR.Tests/**" />
       <EmbeddedResource Remove="RepoXR.Tests/**" />
     </ItemGroup>
+
+    <Target Name="StampSourceRevision" BeforeTargets="GenerateAssemblyInfo">
+        <Exec Command="git rev-parse --short=7 HEAD" ConsoleToMSBuild="true" IgnoreExitCode="true" WorkingDirectory="$(MSBuildProjectDirectory)">
+            <Output TaskParameter="ConsoleOutput" PropertyName="GitRevision" />
+        </Exec>
+        <PropertyGroup>
+            <InformationalVersion Condition="'$(GitRevision)' != ''">$(Version)+$(GitRevision)</InformationalVersion>
+        </PropertyGroup>
+    </Target>
 
     <ItemGroup>
       <EmbeddedResource Remove="Preload\**" />
