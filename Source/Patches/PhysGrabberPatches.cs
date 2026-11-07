@@ -25,15 +25,40 @@ internal static class PhysGrabberPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> UpdatePatches(IEnumerable<CodeInstruction> instructions)
     {
-        return GameSignatures.EditOrOriginal(instructions, "PhysGrabber hand aim", matcher =>
+        var list = new List<CodeInstruction>(instructions);
+        updateUsesOverrideCall = false;
+        foreach (var instruction in list)
         {
-            matcher.MatchForward(false, new CodeMatch(IsOverrideTransformCall));
-            if (matcher.IsInvalid)
-                throw new InvalidOperationException("GetOverrideTransform was not called");
+            if (!IsOverrideTransformCall(instruction))
+                continue;
 
-            return matcher.Repeat(match =>
-                match.Set(OpCodes.Call, PlayerLocalCameraExtensions.GetHandOverrideTransformMethod));
-        });
+            instruction.opcode = OpCodes.Call;
+            instruction.operand = PlayerLocalCameraExtensions.GetHandOverrideTransformMethod;
+            updateUsesOverrideCall = true;
+        }
+
+        Logger.LogInfo(updateUsesOverrideCall
+            ? "PhysGrabber.Update hand aim swapped GetOverrideTransform."
+            : "PhysGrabber.Update has no GetOverrideTransform. Hand aim follows the hand for each call.");
+        return list;
+    }
+
+    static bool updateUsesOverrideCall;
+
+    [HarmonyPatch(typeof(PhysGrabber), nameof(PhysGrabber.Update))]
+    [HarmonyPrefix]
+    static void HandAimPrefix(PhysGrabber __instance, out AimRedirect __state)
+    {
+        __state = updateUsesOverrideCall || __instance is not { isLocal: true }
+            ? AimRedirect.None
+            : AimRedirect.ForGrabTurn(__instance);
+    }
+
+    [HarmonyPatch(typeof(PhysGrabber), nameof(PhysGrabber.Update))]
+    [HarmonyPostfix]
+    static void HandAimPostfix(AimRedirect __state)
+    {
+        __state?.Restore();
     }
 
     /// <summary>

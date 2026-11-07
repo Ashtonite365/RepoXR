@@ -146,15 +146,27 @@ internal static class AssetCollection
     static void LoadLocalizationCatalog()
     {
         const string catalogMessage =
-            "VR localization catalog did not load. This game expects a binary Addressables catalog and RepoXR ships catalog_0.1.json. Headset and controller VR still start. Tutorial text overrides stay on the desktop wording.";
+            "VR localization catalog did not load. Headset and controller VR still start. Tutorial text stays on the desktop wording until a string asset is found.";
+
+        var path = Path.Combine(AddressablesPath, "catalog_0.1.json");
+        if (File.Exists(path) && CatalogFile.IsJson(File.ReadAllBytes(path)))
+        {
+            LocalizationCatalogFailed = true;
+            var indexed = IndexLocalizedBundles();
+            Logger.LogInfo(indexed > 0
+                ? $"JSON localization catalog was not sent to Addressables. Indexed {indexed} VR string asset(s) from the local bundles."
+                : "JSON localization catalog was not sent to Addressables. " + catalogMessage);
+            return;
+        }
 
         try
         {
-            var catalog = Addressables.LoadContentCatalogAsync(Path.Combine(AddressablesPath, "catalog_0.1.json"), true);
+            var catalog = Addressables.LoadContentCatalogAsync(path, true);
             catalog.WaitForCompletion();
+            if (catalog.Status == AsyncOperationStatus.Succeeded)
+                return;
 
-            if (catalog.Status != AsyncOperationStatus.Succeeded)
-                RememberLocalizationFallback(catalogMessage);
+            RememberLocalizationFallback(catalogMessage);
         }
         catch (Exception ex)
         {
@@ -209,12 +221,11 @@ internal static class AssetCollection
 
     static AssetBundle? OpenBundle(string path)
     {
-        var fileName = Path.GetFileNameWithoutExtension(path);
         foreach (var loaded in openedBundles)
         {
             if (loaded == null)
                 continue;
-            if (string.Equals(loaded.name, fileName, StringComparison.OrdinalIgnoreCase))
+            if (CatalogFile.SameLoadedBundle(path, loaded.name))
                 return loaded;
         }
 

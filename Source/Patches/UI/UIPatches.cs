@@ -41,29 +41,16 @@ internal static class UIPatches
     }
 
     /// <summary>
-    /// Block other UI hover logic if we're checking two different canvasses
+    /// 1.3.10 returned false here whenever the interaction toolkit had no stored UI hit.
+    /// The line was visible and hover never reached the button test. The patched body
+    /// compares <see cref="XRRayInteractorManager.GetUIHitPosition"/>, which falls back
+    /// to the controller ray. This prefix only records the first button that ray crosses.
     /// </summary>
     [HarmonyPatch(typeof(SemiFunc), nameof(SemiFunc.UIMouseHover))]
     [HarmonyPrefix]
-    private static bool UIPointerHoverOtherCanvasPatch(RectTransform rectTransform, ref bool __result)
+    private static void UIPointerHoverOtherCanvasPatch(RectTransform rectTransform)
     {
-        if (XRRayInteractorManager.Instance is not { } manager)
-            return true;
-
-        var (interactor, _) = manager.GetActiveInteractor();
-        if (!interactor.TryGetCurrentUIRaycastResult(out var result))
-        {
-            __result = false;
-            return false;
-        }
-
-        if (result.gameObject.GetComponentInParent<Canvas>() != rectTransform.GetComponentInParent<Canvas>())
-        {
-            __result = false;
-            return false;
-        }
-
-        return true;
+        XRRayInteractorManager.Instance?.IsOver(rectTransform);
     }
 
     /// <summary>

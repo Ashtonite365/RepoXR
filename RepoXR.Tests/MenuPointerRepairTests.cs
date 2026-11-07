@@ -82,6 +82,19 @@ public class MenuPointerRepairTests
             positionOverrideActive: false));
     }
 
+    [Fact]
+    public void A_json_catalog_is_not_a_binary_catalog()
+    {
+        var json = System.Text.Encoding.UTF8.GetBytes("\n{ \"m_LocatorId\": \"catalog\" }");
+        var binary = new byte[] { 0x00, 0x01, 0x02, 0x03 };
+
+        Assert.True(RepoXR.Assets.CatalogFile.IsJson(json));
+        Assert.False(RepoXR.Assets.CatalogFile.IsJson(binary));
+        Assert.True(RepoXR.Assets.CatalogFile.SameLoadedBundle(
+            @"C:\RepoXR\Addressables\defaultlocalgroup_assets_all_644635e9bfc6a9f81b1adcaf94351997.bundle",
+            "defaultlocalgroup_assets_all_644635e9bfc6a9f81b1adcaf94351997"));
+    }
+
     public static float Axis() => 1f;
 
     public static float ReadAxis(string name) => name.Length;

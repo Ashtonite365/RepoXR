@@ -1,3 +1,10 @@
+# 1.3.11 (RepoXR FBT fork)
+
+**Fixes**:
+- Menu buttons follow the controller ray. 1.3.10 drew the line, then hover gave up unless the interaction toolkit had already stored a UI hit, and `XROrigin.Origin` was never assigned. The origin now has a floor-offset object and its Origin transform. Hover and the pointer position test the ray against the button rect. The trigger is read from the controller as well as the UI-press action. The first button the ray crosses is logged once.
+- `catalog_0.1.json` is not passed to Addressables. That call was the JSON catalog error, the two chain failures, and the second load of `defaultlocalgroup_assets_all_644635e9bfc6a9f81b1adcaf94351997.bundle`. Bundles that are already open are reused.
+- `PhysGrabber.Update` no longer has `GetOverrideTransform` on 0.5.1, which is why hand aim stayed unmatched after the `call`/`callvirt` check. The grabber now aims from the hand for the length of `Update`.
+
 # 1.3.10 (RepoXR FBT fork)
 
 **Fixes**:

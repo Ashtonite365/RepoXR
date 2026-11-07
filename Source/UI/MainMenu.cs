@@ -119,10 +119,23 @@ public class MainMenu : MonoBehaviour
             throw new InvalidOperationException("the VR camera rig is not ready");
 
         var rig = mainCamera.transform.parent.gameObject;
+        var floor = rig.transform.Find("Camera Floor Offset");
+        if (floor == null)
+        {
+            var floorObject = new GameObject("Camera Floor Offset");
+            floorObject.transform.SetParent(rig.transform, false);
+            floor = floorObject.transform;
+        }
+
         var origin = rig.GetComponent<XROrigin>();
         if (origin == null)
             origin = rig.AddComponent<XROrigin>();
+        origin.Origin = rig;
+        origin.CameraFloorOffsetObject = floor.gameObject;
         origin.Camera = mainCamera;
+
+        if (mainCanvas != null)
+            mainCanvas.worldCamera = mainCamera;
 
         if (rig.GetComponent<XRRayInteractorManager>() != null)
             return;

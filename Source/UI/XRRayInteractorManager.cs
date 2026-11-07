@@ -20,6 +20,8 @@ public class XRRayInteractorManager : MonoBehaviour
     private LineRenderer rightRenderer;
 
     private ActiveController activeController;
+    InputAction leftTrigger;
+    InputAction rightTrigger;
     
     private void Awake()
     {
@@ -34,6 +36,10 @@ public class XRRayInteractorManager : MonoBehaviour
             rightActions.uiPressAction.action.performed += RightControllerPressed;
 
             UpdateActiveController(ActiveController.Right);
+            leftTrigger = new InputAction(binding: "<XRController>{LeftHand}/triggerPressed");
+            rightTrigger = new InputAction(binding: "<XRController>{RightHand}/triggerPressed");
+            leftTrigger.Enable();
+            rightTrigger.Enable();
         }
         catch (Exception ex)
         {
@@ -52,6 +58,10 @@ public class XRRayInteractorManager : MonoBehaviour
             leftActions.uiPressAction.action.performed -= LeftControllerPressed;
         if (rightActions != null && rightActions.uiPressAction.action != null)
             rightActions.uiPressAction.action.performed -= RightControllerPressed;
+        leftTrigger?.Disable();
+        rightTrigger?.Disable();
+        leftTrigger?.Dispose();
+        rightTrigger?.Dispose();
     }
 
     void LateUpdate()
@@ -106,38 +116,101 @@ public class XRRayInteractorManager : MonoBehaviour
         UpdateActiveController(ActiveController.Right);
     }
 
+    static bool loggedMenuHit;
+
+    public bool IsOver(RectTransform rect)
+    {
+        if (rect == null || !TryHit(rect, out _))
+            return false;
+
+        if (!loggedMenuHit)
+        {
+            loggedMenuHit = true;
+            Logger.LogInfo($"Menu pointer is over '{rect.name}'.");
+        }
+
+        return true;
+    }
+
     public Vector2 GetUIHitPosition(RectTransform? rect)
     {
+        if (rect != null && TryHit(rect, out var world))
+            return LocalOnCanvas(rect, world);
+
         var (interactor, _) = GetActiveInteractor();
-        if (!interactor.TryGetCurrentUIRaycastResult(out var result))
-            return Vector2.one * -1000;
+        if (interactor != null && interactor.TryGetCurrentUIRaycastResult(out var result) && result.gameObject != null)
+        {
+            var space = rect != null
+                ? rect.GetComponentInParent<Canvas>()?.transform ?? rect
+                : result.gameObject.GetComponentInParent<Canvas>()?.transform;
+            if (space != null)
+            {
+                var local = space.InverseTransformPoint(result.worldPosition);
+                return new Vector2(local.x, local.y);
+            }
+        }
 
-        var canvas = rect is null
-            ? result.gameObject.GetComponentInParent<Canvas>().transform
-            : rect.GetComponentInParent<Canvas>().transform;
+        return Vector2.one * -1000;
+    }
 
-        var local = canvas.InverseTransformPoint(result.worldPosition);
+    static Vector2 LocalOnCanvas(RectTransform rect, Vector3 world)
+    {
+        var space = rect.GetComponentInParent<Canvas>()?.transform ?? rect;
+        var local = space.InverseTransformPoint(world);
         return new Vector2(local.x, local.y);
+    }
+
+    bool TryHit(RectTransform rect, out Vector3 world)
+    {
+        world = default;
+        var (interactor, _) = GetActiveInteractor();
+        if (interactor != null && interactor.TryGetCurrentUIRaycastResult(out var result) &&
+            result.gameObject != null && result.gameObject.transform.IsChildOf(rect))
+        {
+            world = result.worldPosition;
+            return true;
+        }
+
+        if (interactor == null)
+            return false;
+
+        return MenuRay.Hits(interactor.transform, rect, out world);
     }
 
     public RectTransform GetUIHitRectTransform()
     {
         var (interactor, _) = GetActiveInteractor();
-        return !interactor.TryGetCurrentUIRaycastResult(out var result)
-            ? HUDCanvas.instance.GetComponent<RectTransform>()
-            : result.gameObject.GetComponent<RectTransform>();
+        return interactor != null && interactor.TryGetCurrentUIRaycastResult(out var result) && result.gameObject != null
+            ? result.gameObject.GetComponent<RectTransform>()
+            : HUDCanvas.instance.GetComponent<RectTransform>();
     }
 
     public bool GetTriggerDown()
     {
         var (_, actions) = GetActiveInteractor();
-        return actions.uiPressAction.action.WasPressedThisFrame();
+        if (actions != null && actions.uiPressAction.action != null &&
+            actions.uiPressAction.action.WasPressedThisFrame())
+            return true;
+
+        return DeviceTrigger(true);
     }
 
     public bool GetTriggerButton()
     {
         var (_, actions) = GetActiveInteractor();
-        return actions.uiPressAction.action.IsPressed();
+        if (actions != null && actions.uiPressAction.action != null && actions.uiPressAction.action.IsPressed())
+            return true;
+
+        return DeviceTrigger(false);
+    }
+
+    bool DeviceTrigger(bool down)
+    {
+        var action = activeController == ActiveController.Left ? leftTrigger : rightTrigger;
+        if (action == null)
+            return false;
+
+        return down ? action.WasPressedThisFrame() : action.IsPressed();
     }
 
     public float GetUIScrollX()
