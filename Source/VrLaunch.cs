@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using Steamworks;
 
 namespace RepoXR;
 
@@ -25,10 +26,69 @@ internal static class VrLaunch
         "vrmonitor.exe", "vrserver.exe", "vrwebhelper.exe", "vrcompositor.exe", "steamtours.exe"
     ];
 
+    /// <summary>
+    /// How long to wait for the game to finish Steam startup before deciding a launch
+    /// with no command-line, environment, or parent signal is desktop. Steam's own
+    /// "running in VR" flag is not readable until that init. This does not wait on a headset.
+    /// </summary>
+    internal const float SteamVrModeWaitSeconds = 3f;
+
     public static bool ShouldAttemptOpenXr() => !string.IsNullOrEmpty(Describe());
 
     public static string Describe() =>
         Describe(Environment.GetCommandLineArgs(), Environment.GetEnvironmentVariable, ParentLooksLikeSteamVr);
+
+    internal readonly struct LaunchEvidence
+    {
+        public LaunchEvidence(string decision, string detail)
+        {
+            Decision = decision;
+            Detail = detail;
+        }
+
+        public string Decision { get; }
+        public string Detail { get; }
+        public bool StartOpenXr => Decision.Length > 0;
+
+        public string Line =>
+            $"OpenXR launch check: {(Decision.Length == 0 ? "desktop" : Decision)}. {Detail}";
+
+        public string DisabledLine => $"OpenXR launch check: disabled. {Detail}";
+    }
+
+    internal static LaunchEvidence Collect(IReadOnlyList<string> args, Func<string, string?> environment,
+        IReadOnlyList<string> parents, string steamRunningInVr)
+    {
+        var decision = Describe(args, environment,
+            () => parents.Any(name => SteamVrProcessNames.Contains(name, StringComparer.OrdinalIgnoreCase)));
+        if (decision.Length == 0 && steamRunningInVr == "true")
+            decision = "Steam is running in VR";
+
+        var detail =
+            $"args=[{string.Join(" | ", args)}]; REPOXR_VR={Show(environment("REPOXR_VR"))}; VR_LAUNCH={Show(environment("VR_LAUNCH"))}; VR_OVERRIDE={Show(environment("VR_OVERRIDE"))}; parents=[{string.Join(", ", parents)}]; Steam running in VR={steamRunningInVr}.";
+        return new LaunchEvidence(decision, detail);
+    }
+
+    internal static bool WaitingForSteam(bool steamClientValid, float elapsedSeconds, float budgetSeconds) =>
+        !steamClientValid && elapsedSeconds < budgetSeconds;
+
+    internal static string ReadSteamRunningInVr()
+    {
+        try
+        {
+            if (!SteamClient.IsValid)
+                return "unavailable";
+
+            return SteamUtils.IsSteamRunningInVR ? "true" : "false";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug($"Steam VR mode could not be read: {ex.Message}");
+            return "unavailable";
+        }
+    }
+
+    static string Show(string? value) => string.IsNullOrEmpty(value) ? "unset" : value;
 
     internal static string Describe(IReadOnlyList<string> args, Func<string, string?> environment,
         Func<bool> parentLooksLikeSteamVr)
@@ -57,21 +117,31 @@ internal static class VrLaunch
     static bool Truthy(string? value) =>
         value is "1" or "true" or "True" or "TRUE" or "yes" or "Yes";
 
-    static bool ParentLooksLikeSteamVr()
+    static bool ParentLooksLikeSteamVr() =>
+        ReadParentChain().Any(name => SteamVrProcessNames.Contains(name, StringComparer.OrdinalIgnoreCase));
+
+    internal static IReadOnlyList<string> ReadParentChain()
     {
+        var names = new List<string>();
         try
         {
             var pid = ParentPid(GetCurrentProcess());
             for (var depth = 0; depth < 4 && pid > 0; depth++)
             {
                 var name = ImageName(pid);
-                if (name != null &&
-                    SteamVrProcessNames.Contains(name, StringComparer.OrdinalIgnoreCase))
-                    return true;
+                if (string.IsNullOrEmpty(name))
+                {
+                    names.Add($"pid {pid} unreadable");
+                    break;
+                }
 
+                names.Add(name);
                 var handle = OpenProcess(0x1000, false, pid);
                 if (handle == IntPtr.Zero)
+                {
+                    names.Add("next parent unreadable");
                     break;
+                }
 
                 try
                 {
@@ -88,10 +158,11 @@ internal static class VrLaunch
         }
         catch (Exception ex)
         {
+            names.Add("parent walk failed");
             Logger.LogDebug($"Could not read the parent process while deciding VR launch: {ex.Message}");
         }
 
-        return false;
+        return names;
     }
 
     static int ParentPid(IntPtr process)

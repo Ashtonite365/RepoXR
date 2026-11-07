@@ -96,4 +96,51 @@ public class VrLaunchTests
         Assert.True(OpenXrSessionProbe.IsSteamVr("OpenXR", @"C:\Steam\steamxr_win64.json"));
         Assert.False(OpenXrSessionProbe.IsSteamVr("Oculus OpenXR", @"C:\Oculus\oculus_openxr_64.json"));
     }
+
+    [Fact]
+    public void Steam_running_in_vr_is_a_launch_signal_without_a_parent_process()
+    {
+        var evidence = VrLaunch.Collect(["REPO.exe"], _ => null, ["steam.exe"], "true");
+
+        Assert.Equal("Steam is running in VR", evidence.Decision);
+        Assert.True(evidence.StartOpenXr);
+        Assert.Contains("parents=[steam.exe]", evidence.Line);
+        Assert.Contains("args=[REPO.exe]", evidence.Line);
+        Assert.DoesNotContain("headset", evidence.Line, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Desktop_steam_parent_does_not_start_openxr()
+    {
+        var evidence = VrLaunch.Collect(["REPO.exe"], _ => null, ["steam.exe"], "false");
+
+        Assert.Equal("", evidence.Decision);
+        Assert.False(evidence.StartOpenXr);
+        Assert.StartsWith("OpenXR launch check: desktop.", evidence.Line);
+        Assert.Contains("Steam running in VR=false", evidence.Line);
+        Assert.Contains("REPOXR_VR=unset", evidence.Line);
+    }
+
+    [Fact]
+    public void Unavailable_steam_vr_mode_stays_desktop_and_records_an_unmatched_env_value()
+    {
+        var evidence = VrLaunch.Collect(["REPO.exe"], name => name == "VR_LAUNCH" ? "openvr" : null, [],
+            "unavailable");
+
+        Assert.False(evidence.StartOpenXr);
+        Assert.Contains("VR_LAUNCH=openvr", evidence.Line);
+        Assert.Contains("parents=[]", evidence.Line);
+    }
+
+    [Fact]
+    public void Steam_wait_is_bounded_and_stops_when_the_client_is_ready()
+    {
+        Assert.Equal(3f, VrLaunch.SteamVrModeWaitSeconds);
+        Assert.True(VrLaunch.WaitingForSteam(steamClientValid: false, elapsedSeconds: 0f,
+            VrLaunch.SteamVrModeWaitSeconds));
+        Assert.False(VrLaunch.WaitingForSteam(steamClientValid: false, elapsedSeconds: 3f,
+            VrLaunch.SteamVrModeWaitSeconds));
+        Assert.False(VrLaunch.WaitingForSteam(steamClientValid: true, elapsedSeconds: 0f,
+            VrLaunch.SteamVrModeWaitSeconds));
+    }
 }

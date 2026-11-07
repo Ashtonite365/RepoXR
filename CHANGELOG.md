@@ -1,3 +1,8 @@
+# 1.3.8 (RepoXR FBT fork)
+
+**Fixes**:
+- A 1.3.7 launch that logged `Desktop launch. OpenXR was not started.` never reached the runtime probe. The command line, `REPOXR_VR` / `VR_LAUNCH` / `VR_OVERRIDE`, and the parent process names are now written on one line so the next launch shows which check missed. If none of those match, startup waits up to 3 seconds for the game's own Steam init and then reads `SteamUtils.IsSteamRunningInVR`. That is Steam's "Steam is in VR mode" flag, not "a SteamVR process exists." A desktop launch whose flag is false still does not start OpenXR. A flag that is true continues into the existing runtime check, which still stays non-VR with one info line when no headset session exists, and still reports a real Unity OpenXR failure when a session was started and then failed.
+
 # 1.3.7 (RepoXR FBT fork)
 
 **Fixes**:

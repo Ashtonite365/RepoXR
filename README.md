@@ -30,6 +30,7 @@ Here is a list of RepoXR versions and which version(s) of R.E.P.O. it supports
 
 | RepoXR FBT | R.E.P.O. Version |
 |------------|------------------|
+| v1.3.8 (log the OpenXR launch check; follow Steam's in-VR flag) | v0.5.1 |
 | v1.3.7 (skip OpenXR when no runtime is connected) | v0.5.1 |
 | v1.3.6 (hand aim on 0.5.1) | v0.5.1 |
 | v1.3.5 (0.5.1 target, desktop skips OpenXR) | v0.5.1 |
