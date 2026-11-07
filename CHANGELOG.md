@@ -1,3 +1,9 @@
+# 1.3.15 (RepoXR FBT fork)
+
+**Fixes**:
+- The 14:35 headset photo shows the button list high in the lens. The 1.3.14 log put the HUD Canvas pivot at viewport `(0.5,0.5,1.4)` while `Menu Page Main(Clone)` is nested on that canvas, so the buttons are not at the pivot. The canvas is shifted by the menu content's centre, then left in the world on the camera rig. It is not parented to the headset.
+- The desktop mirror is black while the headset still draws the scene. `UI/UI/Canvas` is a screen overlay and was left enabled in 1.3.14. That overlay draws on the game window after the headset image. It is disabled again, and any other screen-space overlay is disabled once, with its name logged. `CustomCamera` is unchanged.
+
 # 1.3.14 (RepoXR FBT fork)
 
 **Fixes**:

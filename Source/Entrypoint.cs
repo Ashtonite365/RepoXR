@@ -23,8 +23,12 @@ internal static class Entrypoint
         // We grab all these references manually as most of the instances aren't set yet
         // Since most of them run in the "Start" lifetime function
 
-        // UI/UI/Canvas is not HUD Canvas. 1.3.13 proved the main menu page was not
-        // on HUD Canvas yet, so this canvas stays enabled until that page resolves it.
+        // UI/UI/Canvas is a screen overlay. Left enabled it covers the desktop mirror
+        // while the headset still draws the world cameras. The menu page is under HUD Canvas.
+        var blocking = GameObject.Find("UI/UI/Canvas");
+        var blockingCanvas = blocking != null ? blocking.GetComponent<Canvas>() : null;
+        if (blockingCanvas != null)
+            blockingCanvas.enabled = false;
 
         var canvas = GameObject.Find("UI/HUD/HUD Canvas").transform;
         var fade = canvas.Find("Fade");

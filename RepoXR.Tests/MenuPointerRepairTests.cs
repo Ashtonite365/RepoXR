@@ -130,6 +130,10 @@ public class MenuPointerRepairTests
         Assert.True(RepoXR.UI.MenuTarget.IsHudCanvas("HUD Canvas"));
         Assert.False(RepoXR.UI.MenuTarget.IsHudCanvas("Canvas"));
         Assert.Equal(1.6f / 1920f, RepoXR.UI.MenuTarget.ScaleForWidth(1920f, 1.6f), 5);
+        var shifted = RepoXR.UI.MenuTarget.LocalPositionForContent(400f, 300f, 0.002f, 1.4f);
+        Assert.Equal(-0.8f, shifted.x, 4);
+        Assert.Equal(-0.6f, shifted.y, 4);
+        Assert.Equal(1.4f, shifted.z, 4);
     }
 
     public static float Axis() => 1f;

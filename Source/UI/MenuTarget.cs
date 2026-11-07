@@ -29,4 +29,12 @@ internal static class MenuTarget
 
         return widthMeters / pixelWidth;
     }
+
+    /// <summary>
+    /// Canvas-local position that puts content, measured from the canvas pivot, on the view centre.
+    /// Positive content Y is above the pivot, so the canvas moves down.
+    /// </summary>
+    internal static (float x, float y, float z) LocalPositionForContent(float contentCenterX, float contentCenterY,
+        float scale, float distance) =>
+        (-contentCenterX * scale, -contentCenterY * scale, distance);
 }
