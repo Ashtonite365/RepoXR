@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Reflection;
 using System.Reflection.Emit;
 using HarmonyLib;
 using RepoXR.Assets;
@@ -51,34 +52,56 @@ internal static class MenuTextInputPatches
             .SetOperandAndAdvance(PropertySetter(typeof(Transform), nameof(Transform.localPosition)))
             .InstructionEnumeration();
     }
-    
-    // Bunch of menu close detection patches
+}
 
-    [HarmonyPatch(typeof(MenuPageServerListCreateNew), nameof(MenuPageServerListCreateNew.ExitPage))]
-    [HarmonyPostfix]
-    private static void OnCreateServerButtonExit()
+/// <summary>
+/// Close the VR keyboard when the old server-list text pages close.
+/// Those pages are gone in 0.5.x, so this class skips itself instead of
+/// failing every other patch in the text-input class.
+/// </summary>
+[RepoXRPatch]
+internal static class ServerListKeyboardPatches
+{
+    [HarmonyPrepare]
+    static bool Prepare()
     {
-        InputKeyboard.instance.Close();
+        foreach (var _ in TargetMethods())
+            return true;
+
+        return false;
     }
 
-    [HarmonyPatch(typeof(MenuPageServerListCreateNew), nameof(MenuPageServerListCreateNew.ButtonConfirm))]
-    [HarmonyPostfix]
-    private static void OnCreateServerButtonConfirm()
+    [HarmonyTargetMethods]
+    static IEnumerable<MethodBase> TargetMethods()
     {
-        InputKeyboard.instance.Close();
+        foreach (var typeName in new[] { "MenuPageServerListCreateNew", "MenuPageServerListSearch" })
+        {
+            var type = MenuPageSavesPatches.GameType(typeName);
+            if (type == null)
+                continue;
+
+            foreach (var name in new[] { "ButtonConfirm", "ExitPage" })
+            {
+                var method = type.GetMethod(name,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+                if (method != null)
+                    yield return method;
+            }
+        }
+
+        // 0.5.1 keeps create and search on the server list itself.
+        foreach (var name in new[] { "ExitPage", "SetSearch" })
+        {
+            var method = typeof(MenuPageServerList).GetMethod(name,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+            if (method != null)
+                yield return method;
+        }
     }
 
-    [HarmonyPatch(typeof(MenuPageServerListSearch), nameof(MenuPageServerListSearch.ExitPage))]
     [HarmonyPostfix]
-    private static void OnSearchServerButtonExit()
+    static void Postfix()
     {
-        InputKeyboard.instance.Close();
-    }
-
-    [HarmonyPatch(typeof(MenuPageServerListSearch), nameof(MenuPageServerListSearch.ButtonConfirm))]
-    [HarmonyPostfix]
-    private static void OnSearchServerButtonConfirm()
-    {
-        InputKeyboard.instance.Close();
+        InputKeyboard.instance?.Close();
     }
 }

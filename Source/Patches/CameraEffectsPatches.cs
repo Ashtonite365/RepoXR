@@ -15,11 +15,20 @@ namespace RepoXR.Patches;
 internal static class CameraEffectsPatches
 {
     /// <summary>
-    /// Disable camera shake in the main menu
+    /// Disable camera shake in the main menu.
+    /// 0.5.x has Shake(float strengthAdd, float time) and Shake(float strengthAdd, float time, float rumbleMultiplier).
+    /// Naming Shake without argument types throws AmbiguousMatchException.
     /// </summary>
-    [HarmonyPatch(typeof(CameraShake), nameof(CameraShake.Shake))]
+    [HarmonyPatch(typeof(CameraShake), nameof(CameraShake.Shake), typeof(float), typeof(float))]
     [HarmonyPrefix]
     private static bool DisableShakeMenu()
+    {
+        return !SemiFunc.MenuLevel();
+    }
+
+    [HarmonyPatch(typeof(CameraShake), nameof(CameraShake.Shake), typeof(float), typeof(float), typeof(float))]
+    [HarmonyPrefix]
+    private static bool DisableShakeMenuWithRumble()
     {
         return !SemiFunc.MenuLevel();
     }

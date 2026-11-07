@@ -17,16 +17,11 @@ internal static class SplashScreenPatches
     [HarmonyPostfix]
     private static void AddRepoXRLogoPatch(SplashScreenUI __instance)
     {
-        var logoObject = new GameObject("RepoXR Logo")
-        {
-            transform =
-            {
-                parent = __instance.semiworkTransform.parent,
-                localPosition = Vector3.zero,
-                localRotation = Quaternion.identity,
-                localScale = Vector3.one * 0.8f
-            }
-        };
+        var logoObject = new GameObject("RepoXR Logo");
+        logoObject.transform.SetParent(__instance.semiworkTransform.parent, false);
+        logoObject.transform.localPosition = Vector3.zero;
+        logoObject.transform.localRotation = Quaternion.identity;
+        logoObject.transform.localScale = Vector3.one * 0.8f;
         
         logoObject.AddComponent<Image>().sprite = AssetCollection.Logo;
         logoObject.SetActive(false);
@@ -39,6 +34,9 @@ internal static class SplashScreenPatches
     [HarmonyPostfix]
     private static void LogoAnimationPatch(SplashScreen __instance)
     {
+        if (logoTransform == null || SplashScreenUI.instance == null || SplashScreenUI.instance.semiworkTransform == null)
+            return;
+
         logoTransform.localPosition = SplashScreenUI.instance.semiworkTransform.localPosition + Vector3.down * 80;
     }
     
@@ -49,6 +47,9 @@ internal static class SplashScreenPatches
     [HarmonyPostfix]
     private static void SetFadeOverlayPatch(SplashScreen __instance)
     {
+        if (logoTransform == null || SplashScreenUI.instance == null || SplashScreenUI.instance.semiworkTransform == null)
+            return;
+
         logoTransform.gameObject.SetActive(SplashScreenUI.instance.semiworkTransform.gameObject.activeSelf);
         
         FadeOverlay.Instance.Image.color = new Color(0, 0, 0, 1);

@@ -309,22 +309,15 @@ internal static class OpenXR
             BepInEx.Logging.Logger.Sources.Add(Logger);
         }
 
+        public static bool InitializeRuntime(Runtime runtime)
+        {
+            return PrepareLoader() && InitializeXR(runtime);
+        }
+
         public static bool InitializeXR()
         {
-            InitializeScripts();
-
-            // Check if Unity's OpenXR subsystem is available
-            var subsystems = new List<ISubsystemDescriptor>();
-            SubsystemManager.GetAllSubsystemDescriptors(subsystems);
-
-            if (!(subsystems.Any(subsystem => subsystem.id == "OpenXR Input") &&
-                  subsystems.Any(subsystem => subsystem.id == "OpenXR Display")))
-            {
-                Logger.LogError(
-                    "No Unity OpenXR subsystem found, this installation of RepoXR was not installed correctly.");
-
+            if (!PrepareLoader())
                 return false;
-            }
 
             // Cannot override runtime if high integrity: https://github.com/KhronosGroup/OpenXR-SDK-Source/blob/main/src/common/platform_utils.hpp#L317
             if (Native.IsHighIntegrityLevel())
@@ -370,6 +363,23 @@ internal static class OpenXR
                     return true;
 
             Logger.LogError("All available runtimes were attempted, but none worked. Aborting...");
+            return false;
+        }
+
+        static bool PrepareLoader()
+        {
+            InitializeScripts();
+
+            // Check if Unity's OpenXR subsystem is available
+            var subsystems = new List<ISubsystemDescriptor>();
+            SubsystemManager.GetAllSubsystemDescriptors(subsystems);
+
+            if (subsystems.Any(subsystem => subsystem.id == "OpenXR Input") &&
+                subsystems.Any(subsystem => subsystem.id == "OpenXR Display"))
+                return true;
+
+            Logger.LogError(
+                "No Unity OpenXR subsystem found, this installation of RepoXR was not installed correctly.");
             return false;
         }
 
@@ -438,12 +448,19 @@ internal static class OpenXR
             OpenXRSettings.Instance.depthSubmissionMode = OpenXRSettings.DepthSubmissionMode.None;
 
             var features = new List<OpenXRFeature>(AssetCollection.OpenXRFeatures.Features);
-            // OpenXR interaction profiles cannot be added after the session starts.
-            // Register the additive tracker profile up front so the pause-menu switch
-            // only enables or disables applying poses. Controllers keep their own profile.
-            features.Add(ViveTrackerFeature.CreateInjected());
-            Logger.LogInfo(
-                "Vive tracker profile registered. Full body tracking can be turned on or off from the pause menu without restarting.");
+            // Unity asks SteamVR for xrGetCurrentInteractionProfile on every registered
+            // tracker role. With no tracker bound, SteamVR returns XR_ERROR_PATH_UNSUPPORTED
+            // once per role (seven lines). Register the profile only when body tracking
+            // is already on. Controllers keep their own profile either way.
+            if (Plugin.Config.EnableFullBodyTracking.Value)
+            {
+                features.Add(ViveTrackerFeature.CreateInjected());
+                Logger.LogInfo(
+                    "Vive tracker profile registered because full-body tracking is on. A tracker role with no device can still make SteamVR return XR_ERROR_PATH_UNSUPPORTED from Unity's own profile query. Pose binding is separate, and headset controllers are unchanged.");
+            }
+            else
+                Logger.LogInfo(
+                    "Vive tracker profile was not registered. Full-body tracking is off, so SteamVR is not asked for tracker interaction profiles. Turn the option on before the next launch to use trackers.");
 
             OpenXRSettings.Instance.features = features.ToArray();
         }

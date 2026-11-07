@@ -4,6 +4,7 @@ using BepInEx.Configuration;
 using HarmonyLib;
 using RepoXR.Assets;
 using RepoXR.Managers;
+using RepoXR.Patches;
 using RepoXR.Player.Camera;
 using RepoXR.UI;
 using static HarmonyLib.AccessTools;
@@ -20,9 +21,10 @@ internal static class EnemyCeilingEyePatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> SetCameraSoftRotationPatch(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            .MatchForward(false,
-                new CodeMatch(OpCodes.Callvirt, Method(typeof(CameraAim), nameof(CameraAim.AimTargetSoftSet))))
+        var matcher = new CodeMatcher(instructions)
+            .MatchForward(false, new CodeMatch(GameSignatures.IsAimTargetSoftSet));
+        GameSignatures.DropAddedSoftFollowArgument(matcher);
+        return matcher
             .Advance(-11)
             .SetOperandAndAdvance(Field(typeof(VRCameraAim), nameof(VRCameraAim.instance)))
             .Advance(10)

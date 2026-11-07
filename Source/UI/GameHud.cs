@@ -89,7 +89,7 @@ public class GameHud : MonoBehaviour
         var tumbleUi = TumbleUI.instance;
         var tumbleRect = tumbleUi.GetComponent<RectTransform>();
 
-        tumbleRect.transform.parent = OverlayCanvas.transform;
+        tumbleRect.SetParent(OverlayCanvas.transform, false);
         
         tumbleRect.anchorMin = Vector2.zero;
         tumbleRect.anchorMax = Vector2.one;
@@ -122,20 +122,15 @@ public class GameHud : MonoBehaviour
     /// </summary>
     private void SetupSmoothedCanvas()
     {
-        smoothCanvasContainer = new GameObject("VR Smoothed Canvas - Container")
-            { layer = 5, transform = { parent = camera.parent.parent.parent } }.transform;
-        SmoothedCanvas = new GameObject("VR Smoothed Canvas")
-            {
-                layer = 5,
-                transform =
-                {
-                    parent = smoothCanvasContainer,
-                    localScale = Vector3.one * 0.003f,
-                    localPosition = Vector3.zero,
-                    localEulerAngles = Vector3.zero
-                }
-            }
-            .AddComponent<Canvas>();
+        var containerObject = new GameObject("VR Smoothed Canvas - Container") { layer = 5 };
+        containerObject.transform.SetParent(camera.parent.parent.parent, false);
+        smoothCanvasContainer = containerObject.transform;
+        var smoothedObject = new GameObject("VR Smoothed Canvas") { layer = 5 };
+        smoothedObject.transform.SetParent(smoothCanvasContainer, false);
+        smoothedObject.transform.localScale = Vector3.one * 0.003f;
+        smoothedObject.transform.localPosition = Vector3.zero;
+        smoothedObject.transform.localEulerAngles = Vector3.zero;
+        SmoothedCanvas = smoothedObject.AddComponent<Canvas>();
         SmoothedCanvas.renderMode = RenderMode.WorldSpace;
         SmoothedCanvas.gameObject.AddComponent<RectMask2D>();
 
@@ -157,17 +152,12 @@ public class GameHud : MonoBehaviour
     /// </summary>
     private void SetupPauseMenu()
     {
-        var canvas = new GameObject("VR Pause Menu / Chat")
-        {
-            transform =
-            {
-                parent = camera.transform.parent.parent, 
-                localPosition = Vector3.down * 3000, // Move very far away initially to prevent UI flashes during loading
-                localRotation = Quaternion.identity,
-                localScale = Vector3.one * 0.01f
-            },
-            layer = 5
-        }.AddComponent<Canvas>();
+        var pauseObject = new GameObject("VR Pause Menu / Chat") { layer = 5 };
+        pauseObject.transform.SetParent(camera.transform.parent.parent, false);
+        pauseObject.transform.localPosition = Vector3.down * 3000;
+        pauseObject.transform.localRotation = Quaternion.identity;
+        pauseObject.transform.localScale = Vector3.one * 0.01f;
+        var canvas = pauseObject.AddComponent<Canvas>();
         var menu = MenuHolder.instance.transform;
         var rect = menu.GetComponent<RectTransform>();
 
@@ -188,8 +178,9 @@ public class GameHud : MonoBehaviour
         
         // Put chat on the pause canvas (or disable if singleplayer)
 
-        var chatHolder = new GameObject("Chat Holder") { transform = { parent = canvas.transform } }
-            .AddComponent<RectTransform>();
+        var chatObject = new GameObject("Chat Holder");
+        chatObject.transform.SetParent(canvas.transform, false);
+        var chatHolder = chatObject.AddComponent<RectTransform>();
 
         chatHolder.sizeDelta = new Vector2(720, 450);
         chatHolder.pivot = Vector2.zero;

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using JetBrains.Annotations;
@@ -15,6 +16,11 @@ namespace RepoXR.Assets;
 internal static class AssetCollection
 {
     private static AssetBundle assetBundle;
+    static readonly Dictionary<string, LocalizedAsset> localizedByKey = new();
+    static readonly List<AssetBundle> openedBundles = new();
+    static readonly List<string> openedBundleFiles = new();
+    static bool localizationIndexed;
+    internal static bool LocalizationCatalogFailed { get; private set; }
 
     public static OpenXRFeaturePack OpenXRFeatures;
 
@@ -141,19 +147,145 @@ internal static class AssetCollection
     static void LoadLocalizationCatalog()
     {
         const string catalogMessage =
-            "VR localization catalog did not load. This game expects a binary Addressables catalog and RepoXR ships catalog_0.1.json. Headset and controller VR still start. Tutorial text overrides stay on the desktop wording.";
+            "VR localization catalog did not load. Headset and controller VR still start. Tutorial text stays on the desktop wording until a string asset is found.";
+
+        var path = Path.Combine(AddressablesPath, "catalog_0.1.json");
+        if (File.Exists(path) && CatalogFile.IsJson(File.ReadAllBytes(path)))
+        {
+            LocalizationCatalogFailed = true;
+            var indexed = IndexLocalizedBundles();
+            Logger.LogInfo(indexed > 0
+                ? $"JSON localization catalog was not sent to Addressables. Indexed {indexed} VR string asset(s) from the local bundles."
+                : "JSON localization catalog was not sent to Addressables. " + catalogMessage);
+            return;
+        }
 
         try
         {
-            var catalog = Addressables.LoadContentCatalogAsync(Path.Combine(AddressablesPath, "catalog_0.1.json"), true);
+            var catalog = Addressables.LoadContentCatalogAsync(path, true);
             catalog.WaitForCompletion();
+            if (catalog.Status == AsyncOperationStatus.Succeeded)
+                return;
 
-            if (catalog.Status != AsyncOperationStatus.Succeeded)
-                Logger.LogWarning(catalogMessage);
+            RememberLocalizationFallback(catalogMessage);
         }
         catch (Exception ex)
         {
-            Logger.LogWarning($"{catalogMessage} ({ex.GetType().Name}: {ex.Message})");
+            RememberLocalizationFallback($"{catalogMessage} ({ex.GetType().Name}: {ex.Message})");
+        }
+    }
+
+    static void RememberLocalizationFallback(string message)
+    {
+        LocalizationCatalogFailed = true;
+        var indexed = IndexLocalizedBundles();
+        Logger.LogInfo(indexed > 0
+            ? $"Addressables rejected catalog_0.1.json. Indexed {indexed} VR string asset(s) from the bundles already on disk."
+            : message);
+    }
+
+    public static LocalizedAsset? FindLocalizedInBundle(string key)
+    {
+        if (string.IsNullOrEmpty(key))
+            return null;
+
+        if (!localizationIndexed)
+            IndexLocalizedBundles();
+
+        localizedByKey.TryGetValue(key, out var cached);
+        return cached;
+    }
+
+    static int IndexLocalizedBundles()
+    {
+        localizationIndexed = true;
+        IndexBundle(assetBundle);
+        RememberAlreadyLoadedBundles();
+
+        if (Directory.Exists(AddressablesPath))
+        {
+            foreach (var file in Directory.GetFiles(AddressablesPath, "*.bundle"))
+                IndexBundle(OpenBundle(file));
+        }
+
+        return localizedByKey.Count;
+    }
+
+    static void RememberAlreadyLoadedBundles()
+    {
+        foreach (var bundle in AssetBundle.GetAllLoadedAssetBundles())
+        {
+            if (bundle != null && !openedBundles.Contains(bundle))
+                openedBundles.Add(bundle);
+        }
+    }
+
+    static AssetBundle? OpenBundle(string path)
+    {
+        foreach (var loaded in openedBundles)
+        {
+            if (loaded == null)
+                continue;
+            if (CatalogFile.SameLoadedBundle(path, loaded.name))
+                return loaded;
+        }
+
+        foreach (var opened in openedBundleFiles)
+        {
+            if (!CatalogFile.SameLoadedBundle(path, opened))
+                continue;
+
+            Logger.LogInfo(
+                $"Localization bundle {System.IO.Path.GetFileName(path)} was not loaded again. {System.IO.Path.GetFileName(opened)} is already open for that group.");
+            return null;
+        }
+
+        var openNames = new List<string>();
+        foreach (var loaded in openedBundles)
+        {
+            if (loaded != null && !string.IsNullOrEmpty(loaded.name))
+                openNames.Add(loaded.name);
+        }
+
+        Logger.LogInfo(
+            $"Opening localization bundle {System.IO.Path.GetFileName(path)}. Already loaded: {(openNames.Count == 0 ? "(none)" : string.Join(", ", openNames))}.");
+        var bundle = AssetBundle.LoadFromFile(path);
+        openedBundleFiles.Add(path);
+        if (bundle != null)
+            openedBundles.Add(bundle);
+        return bundle;
+    }
+
+    static void IndexBundle(AssetBundle? bundle)
+    {
+        if (bundle == null)
+            return;
+
+        if (!openedBundles.Contains(bundle))
+            openedBundles.Add(bundle);
+
+        foreach (var path in bundle.GetAllAssetNames())
+        {
+            var asset = bundle.LoadAsset<LocalizedAsset>(path);
+            if (asset == null)
+                continue;
+
+            var key = LocalizationKey(asset) ?? Path.GetFileNameWithoutExtension(path);
+            if (!string.IsNullOrEmpty(key) && !localizedByKey.ContainsKey(key))
+                localizedByKey[key] = asset;
+        }
+    }
+
+    static string? LocalizationKey(LocalizedAsset asset)
+    {
+        try
+        {
+            var key = asset.stringReference.TableEntryReference.Key;
+            return string.IsNullOrEmpty(key) ? null : key;
+        }
+        catch (Exception)
+        {
+            return null;
         }
     }
 

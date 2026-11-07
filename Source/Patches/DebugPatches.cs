@@ -14,9 +14,19 @@ internal static class DebugPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> InjectVRTextPatch(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            .MatchForward(false, new CodeMatch(OpCodes.Ldstr, "{0}\n{1} ({2})"))
-            .SetOperandAndAdvance("{0} (VR)\n{1} ({2})")
-            .InstructionEnumeration();
+        var list = new System.Collections.Generic.List<CodeInstruction>(instructions);
+        foreach (var instruction in list)
+        {
+            if (instruction.operand is not string text || !text.Contains("{0}") || !text.Contains("{1}") ||
+                text.Contains("(VR)"))
+                continue;
+
+            instruction.operand = text.Replace("{0}", "{0} (VR)");
+            Logger.LogInfo("Debug tester version label includes VR.");
+            return list;
+        }
+
+        Logger.LogInfo("Debug tester OnGUI has no {0}/{1} version format. The label stays on the game's text.");
+        return list;
     }
 }

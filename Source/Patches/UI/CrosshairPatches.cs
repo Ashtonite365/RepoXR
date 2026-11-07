@@ -16,15 +16,16 @@ internal static class CrosshairPatches
     private static void OnCrosshairCreate(Aim __instance)
     {
         var canvas = new GameObject("Crosshair").AddComponent<Canvas>();
-        var offset = new GameObject("Crosshair Offset")
-            { transform = { parent = canvas.transform, localEulerAngles = new Vector3(270, 270, 0) } };
+        var offset = new GameObject("Crosshair Offset");
+        offset.transform.SetParent(canvas.transform, false);
+        offset.transform.localEulerAngles = new Vector3(270, 270, 0);
         var rect = canvas.GetComponent<RectTransform>();
         
         canvas.renderMode = RenderMode.WorldSpace;
         rect.sizeDelta = new Vector2(40, 40);
         rect.localScale = Vector3.one * 0.01f;
 
-        __instance.transform.parent = offset.transform;
+        __instance.transform.SetParent(offset.transform, false);
         __instance.transform.localPosition = Vector3.zero;
         __instance.transform.localRotation = Quaternion.identity;
         __instance.transform.localScale = Vector3.one;

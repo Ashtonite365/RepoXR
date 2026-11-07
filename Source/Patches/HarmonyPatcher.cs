@@ -83,6 +83,9 @@ internal static class HarmonyPatcher
                 }
             }
         });
+
+        if (target == RepoXRPatchTarget.Universal)
+            AimRedirect.PatchHelpers(patcher);
     }
 
     internal static void PatchNetworkRPCs()

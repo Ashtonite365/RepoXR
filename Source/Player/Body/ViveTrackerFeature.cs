@@ -42,7 +42,7 @@ public class ViveTrackerFeature : OpenXRInteractionFeature
     {
         openxrExtensionStrings = ExtensionName;
         featureIdInternal = FeatureId;
-        nameUi = "RepoXR FBT Vive Trackers";
+        nameUi = "RepoFBT Vive Trackers";
         version = "1.0.0";
         company = "Ashtonite365";
         m_enabled = true;

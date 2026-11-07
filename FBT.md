@@ -4,7 +4,7 @@ This is an optional addition in the **RepoXR FBT** fork ([Ashtonite365/RepoXR](h
 
 Headset and controller VR is unchanged while full-body tracking is off, which is the default. If the trackers are unplugged or not mapped, the semibot keeps the normal animation.
 
-The BepInEx id is `io.ashtonite.repoxr.fbt` and the log name is `RepoXR FBT`. The built file is still `RepoXR.dll`, so it drops into the same folder layout as upstream RepoXR (`BepInEx/plugins/RepoXR/` and `BepInEx/patchers/RepoXR/`). You still need the upstream `RuntimeDeps` native OpenXR plugin and asset bundle from a RepoXR release; this repository does not vendor those binaries. See [COMPILING.md](COMPILING.md).
+The BepInEx id is `io.ashtonite.repoxr.fbt` and the log name is `RepoFBT`. The built file is still `RepoXR.dll`, so it drops into the same folder layout as upstream RepoXR (`BepInEx/plugins/RepoXR/` and `BepInEx/patchers/RepoXR/`). You still need the upstream `RuntimeDeps` native OpenXR plugin and asset bundle from a RepoXR release; this repository does not vendor those binaries. See [COMPILING.md](COMPILING.md).
 
 ## What you can track
 

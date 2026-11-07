@@ -181,7 +181,28 @@ internal static class Utils
     /// <summary>
     /// Resolve a translation key to it's localized value
     /// </summary>
-    public static LocalizedAsset L(string name) => AssetCollection.GetLocalizedAsset(name).WaitForCompletion();
+    public static LocalizedAsset? L(string name)
+    {
+        var fromBundle = AssetCollection.FindLocalizedInBundle(name);
+        if (fromBundle != null || AssetCollection.LocalizationCatalogFailed)
+            return fromBundle;
+
+        try
+        {
+            var handle = AssetCollection.GetLocalizedAsset(name);
+            if (!handle.IsValid())
+                return null;
+
+            var asset = handle.WaitForCompletion();
+            return handle.Status == UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationStatus.Succeeded
+                ? asset
+                : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
 
     public class WaitUntilTimeout(Func<bool> predicate, float timeout) : CustomYieldInstruction
     {

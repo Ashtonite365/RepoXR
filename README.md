@@ -1,8 +1,8 @@
-# RepoXR FBT
+# RepoFBT
 
-**RepoXR FBT** is a GPL-3.0 fork of [RepoXR by DaXcess](https://github.com/DaXcess/RepoXR) with optional 3-point full-body tracking. This repository is [Ashtonite365/RepoXR](https://github.com/Ashtonite365/RepoXR). It is not the official Thunderstore package [`DaXcess-RepoXR`](https://thunderstore.io/c/repo/p/DaXcess/RepoXR). Do not install both plugins in the same BepInEx folder.
+**RepoFBT** is a GPL-3.0 fork of [RepoXR by DaXcess](https://github.com/DaXcess/RepoXR) with optional 3-point full-body tracking. This repository is [Ashtonite365/RepoXR](https://github.com/Ashtonite365/RepoXR). It is not the official Thunderstore package [`DaXcess-RepoXR`](https://thunderstore.io/c/repo/p/DaXcess/RepoXR). Do not install both plugins in the same BepInEx folder.
 
-The BepInEx plugin id is `io.ashtonite.repoxr.fbt` (`RepoXR FBT`). It still builds `RepoXR.dll` / `RepoXR.Preload.dll` and uses the same `BepInEx/plugins/RepoXR` install layout, including the upstream runtime dependencies and asset bundle. Upstream's preload path is the one historically shipped as LCVR; keep that attribution when you redistribute a build.
+The BepInEx plugin id is `io.ashtonite.repoxr.fbt` (`RepoFBT`). It still builds `RepoXR.dll` / `RepoXR.Preload.dll` and uses the same `BepInEx/plugins/RepoXR` install layout, including the upstream runtime dependencies and asset bundle. Upstream's preload path is the one historically shipped as LCVR; keep that attribution when you redistribute a build.
 
 Original RepoXR is a fully fledged R.E.P.O. VR mod that adds full 6-DoF motion controlled VR support to R.E.P.O. Full-body tracking is off unless you enable it. Setup, SteamVR/SlimeVR roles, calibration, and who can see the extra bones are documented in [FBT.md](FBT.md).
 
@@ -30,6 +30,26 @@ Here is a list of RepoXR versions and which version(s) of R.E.P.O. it supports
 
 | RepoXR FBT | R.E.P.O. Version |
 |------------|------------------|
+| v1.3.22 (menu faces the start camera, larger, higher, in front of the nose) | v0.5.1 |
+| v1.3.21 (1.3.17 menu, moved to the sketch pose) | v0.5.1 |
+| v1.3.20 (menu in front of the visible truck, turned to the sketch) | v0.5.1 |
+| v1.3.19 (menu plane is left of the truck in the camera's view) | v0.5.1 |
+| v1.3.18 (menu plane stays left of the truck) | v0.5.1 |
+| v1.3.17 (game menu drawn on a fixed plane) | v0.5.1 |
+| v1.3.16 (stationary game menu; cursor follows the controller plane) | v0.5.1 |
+| v1.3.15 (menu content centred; screen overlay off the mirror) | v0.5.1 |
+| v1.3.14 (main menu page chooses its canvas) | v0.5.1 |
+| v1.3.13 (menu camera stays in the game hierarchy) | v0.5.1 |
+| v1.3.12 (menu cursor follows the controller ray) | v0.5.1 |
+| v1.3.11 (menu ray hits buttons; JSON catalog is not loaded) | v0.5.1 |
+| v1.3.10 (menu ray origin and catalog bundle reuse) | v0.5.1 |
+| v1.3.9 (menu controller pointer and 0.5.1 patch repairs) | v0.5.1 |
+| v1.3.8 (log the OpenXR launch check; follow Steam's in-VR flag) | v0.5.1 |
+| v1.3.7 (skip OpenXR when no runtime is connected) | v0.5.1 |
+| v1.3.6 (hand aim on 0.5.1) | v0.5.1 |
+| v1.3.5 (0.5.1 target, desktop skips OpenXR) | v0.5.1 |
+| v1.3.4 (0.5.1 patch sweep) | v0.5.1. Failed input, grabber, vehicle, and menu patches from 1.3.3 no longer abort startup |
+| v1.3.3 (0.5.1 Harmony overloads) | v0.5.1 VR startup. Shake and the other new overloads are named explicitly |
 | v1.3.2 (OpenXR startup on Unity 6) | v0.5.1 VR startup. Gameplay patches are still the v0.4.4 set |
 | v1.3.1 (pause-menu calibrate, live toggle) | v0.4.4 |
 | v1.3.0 (this fork, adds 3-point FBT) | v0.4.4 |

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -7,6 +8,7 @@ using BepInEx;
 using JetBrains.Annotations;
 using RepoXR.Assets;
 using RepoXR.Patches;
+using RepoXR.Player.Camera;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -20,10 +22,10 @@ public class Plugin : BaseUnityPlugin
 {
     // Distinct from official io.daxcess.repoxr so this fork is not the Thunderstore package identity.
     public const string PLUGIN_GUID = "io.ashtonite.repoxr.fbt";
-    public const string PLUGIN_NAME = "RepoXR FBT";
-    public const string PLUGIN_VERSION = "1.3.2";
+    public const string PLUGIN_NAME = "RepoFBT";
+    public const string PLUGIN_VERSION = "1.3.22";
 
-    public const string SUPPORTED_GAME_VERSION = "v0.4.4";
+    public const string SUPPORTED_GAME_VERSION = "v0.5.1";
 
     public new static Config Config { get; private set; } = null!;
     public static Flags Flags { get; private set; } = 0;
@@ -58,19 +60,41 @@ public class Plugin : BaseUnityPlugin
         if (disableVr)
             Logger.LogWarning("VR has been disabled by config or the `--disable-vr` command line flag");
 
+        launchArgs = Environment.GetCommandLineArgs();
+        launchParents = VrLaunch.ReadParentChain();
+        var immediate = VrLaunch.Collect(launchArgs, Environment.GetEnvironmentVariable, launchParents, "not asked");
+        var launchVr = false;
+        if (disableVr)
+            Logger.LogInfo(immediate.DisabledLine);
+        else if (immediate.StartOpenXr)
+        {
+            Logger.LogInfo(immediate.Line);
+            launchVr = true;
+        }
+        else
+        {
+            watchSteamVrMode = true;
+            steamWatchStart = Time.realtimeSinceStartup;
+        }
+
         if (!PreloadRuntimeDependencies())
         {
+            watchSteamVrMode = false;
             Logger.LogError("Disabling mod because required runtime dependencies could not be loaded!");
             return;
         }
 
         if (!AssetCollection.LoadAssets())
         {
+            watchSteamVrMode = false;
             Logger.LogError("Disabling mod because assets could not be loaded!");
             return;
         }
 
-        if (!disableVr && InitializeVR())
+        if (launchVr)
+            launchVr = OpenXrRuntimeConnected();
+
+        if (launchVr && InitializeVR(pendingRuntime))
             Flags |= Flags.VR;
 
         HarmonyPatcher.PatchUniversal();
@@ -92,20 +116,67 @@ public class Plugin : BaseUnityPlugin
         SceneManager.sceneLoaded += (scene, _) => UniversalEntrypoint.OnSceneLoad(scene.name);
     }
 
-    public static string GetCommitHash()
+    string[] launchArgs = [];
+    IReadOnlyList<string> launchParents = [];
+    bool watchSteamVrMode;
+    float steamWatchStart;
+
+    void Update()
     {
+        if (!watchSteamVrMode)
+            return;
+
+        var steamReady = false;
         try
         {
-            var attribute = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>();
-
-            return attribute?.InformationalVersion.Split('+')[1][..7] ?? "unknown";
+            steamReady = Steamworks.SteamClient.IsValid;
         }
-        catch
+        catch (Exception ex)
         {
-            RepoXR.Logger.LogWarning("Failed to retrieve commit hash (compiled outside of git repo?).");
-
-            return "unknown";
+            RepoXR.Logger.LogDebug($"Steam client state could not be read: {ex.Message}");
         }
+
+        if (VrLaunch.WaitingForSteam(steamReady, Time.realtimeSinceStartup - steamWatchStart,
+                VrLaunch.SteamVrModeWaitSeconds))
+            return;
+
+        watchSteamVrMode = false;
+        var evidence = VrLaunch.Collect(launchArgs, Environment.GetEnvironmentVariable, launchParents,
+            steamReady ? VrLaunch.ReadSteamRunningInVr() : "unavailable");
+        RepoXR.Logger.LogInfo(evidence.Line);
+        if (!evidence.StartOpenXr)
+        {
+            RepoXR.Logger.LogInfo(
+                "Desktop launch. OpenXR was not started. Start R.E.P.O. from the SteamVR dashboard, or add the Steam launch option --repoxr-vr, to play with a headset.");
+            return;
+        }
+
+        if (OpenXrRuntimeConnected() && InitializeVR(pendingRuntime))
+        {
+            Flags |= Flags.VR;
+            CameraAimPatches.AttachExisting();
+            if (GameObject.Find("UI/HUD/HUD Canvas") != null)
+                Entrypoint.SetupDefaultSceneVR();
+        }
+    }
+
+    public static string GetCommitHash()
+    {
+        var version = Assembly.GetExecutingAssembly()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (string.IsNullOrEmpty(version))
+            return "unknown";
+
+        var plus = version.LastIndexOf('+');
+        if (plus < 0 || plus >= version.Length - 1)
+            return "unknown";
+
+        var hash = version[(plus + 1)..];
+        var dirty = hash.IndexOf('-');
+        if (dirty >= 0)
+            hash = hash[..dirty];
+
+        return hash.Length >= 7 ? hash[..7] : hash;
     }
 
     private bool PreloadRuntimeDependencies()
@@ -155,11 +226,50 @@ public class Plugin : BaseUnityPlugin
         return true;
     }
 
-    private static bool InitializeVR()
+    static OpenXR.Runtime? pendingRuntime;
+
+    /// <summary>
+    /// VR was requested. Start OpenXR only when SteamVR is actually running, or another
+    /// runtime can already see a headset. Otherwise stay on the desktop path with one
+    /// info line and do not call the Unity loader.
+    /// </summary>
+    static bool OpenXrRuntimeConnected()
+    {
+        OpenXrSessionProbe.SessionDecision decision;
+        try
+        {
+            var candidates = OpenXrSessionProbe.FromRuntimes(OpenXR.GetRuntimes());
+            decision = OpenXrSessionProbe.Decide(candidates, OpenXrSessionProbe.SteamVrHostRunning(),
+                OpenXrSessionProbe.HeadsetSessionAvailable);
+        }
+        catch (Exception ex)
+        {
+            RepoXR.Logger.LogDebug($"OpenXR runtime probe failed: {ex.Message}");
+            decision = OpenXrSessionProbe.SteamVrHostRunning()
+                ? new OpenXrSessionProbe.SessionDecision(true, false, "", "")
+                : new OpenXrSessionProbe.SessionDecision(false, false, "", "");
+        }
+
+        if (!decision.StartOpenXr)
+        {
+            pendingRuntime = null;
+            RepoXR.Logger.LogInfo(OpenXrSessionProbe.NotConnectedMessage);
+            return false;
+        }
+
+        pendingRuntime = decision.OnlyThisRuntime
+            ? new OpenXR.Runtime { Name = decision.RuntimeName, Path = decision.RuntimeJson }
+            : null;
+        return true;
+    }
+
+    private static bool InitializeVR(OpenXR.Runtime? onlyRuntime)
     {
         RepoXR.Logger.LogInfo("Loading VR...");
 
-        if (!OpenXR.Loader.InitializeXR())
+        if (onlyRuntime is { } runtime
+                ? !OpenXR.Loader.InitializeRuntime(runtime)
+                : !OpenXR.Loader.InitializeXR())
         {
             RepoXR.Logger.LogError("Failed to start in VR Mode! Only Non-VR features are available!");
             RepoXR.Logger.LogError("Make sure your headset is turned on and connected before starting the game.");

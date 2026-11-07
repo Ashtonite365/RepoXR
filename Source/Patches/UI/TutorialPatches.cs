@@ -97,23 +97,27 @@ internal static class TutorialPatches
         var map = __instance.tutorialPages[12];
         var expressions = __instance.tutorialPages[25];
 
-        try
+        var replaced = 0;
+        replaced += AssignText(value => inventoryFill.localizedText = value, "TUTORIAL.INVENTORY_FILL.TEXT");
+        replaced += AssignText(value => inventoryFill.localizedDummyText = value, "TUTORIAL.INVENTORY_FILL.DUMMY_TEXT");
+        replaced += AssignText(value => inventoryEmpty.localizedText = value, "TUTORIAL.INVENTORY_EMPTY.TEXT");
+        replaced += AssignText(value => inventoryEmpty.localizedDummyText = value,
+            "TUTORIAL.INVENTORY_EMPTY.DUMMY_TEXT");
+        replaced += AssignText(value => map.localizedText = value, "TUTORIAL.MAP.TEXT");
+        replaced += AssignText(value => map.localizedDummyText = value, "TUTORIAL.MAP.DUMMY_TEXT");
+        replaced += AssignText(value => expressions.localizedText = value, "TUTORIAL.EXPRESSIONS.TEXT");
+        if (replaced == 0)
+            Logger.LogInfo(
+                "Tutorial prompts stay on the desktop wording. No VR string asset was found for this build.");
+
+        static int AssignText(Action<LocalizedAsset> set, string key)
         {
-            inventoryFill.localizedText = Utils.L("TUTORIAL.INVENTORY_FILL.TEXT");
-            inventoryFill.localizedDummyText = Utils.L("TUTORIAL.INVENTORY_FILL.DUMMY_TEXT");
+            var value = Utils.L(key);
+            if (value == null)
+                return 0;
 
-            inventoryEmpty.localizedText = Utils.L("TUTORIAL.INVENTORY_EMPTY.TEXT");
-            inventoryEmpty.localizedDummyText = Utils.L("TUTORIAL.INVENTORY_EMPTY.DUMMY_TEXT");
-
-            map.localizedText = Utils.L("TUTORIAL.MAP.TEXT");
-            map.localizedDummyText = Utils.L("TUTORIAL.MAP.DUMMY_TEXT");
-
-            expressions.localizedText = Utils.L("TUTORIAL.EXPRESSIONS.TEXT");
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(
-                $"Left the tutorial on the desktop prompts. The VR string catalog is unavailable on this game build ({ex.GetType().Name}: {ex.Message}).");
+            set(value);
+            return 1;
         }
     }
 

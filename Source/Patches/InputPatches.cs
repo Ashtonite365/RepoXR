@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Reflection.Emit;
 using HarmonyLib;
 using RepoXR.Assets;
 using RepoXR.Input;
+using RepoXR.Managers;
 using RepoXR.UI;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -243,9 +245,17 @@ internal static class InputPatches
     /// </summary>
     [HarmonyPatch(typeof(InputManager), nameof(InputManager.InputDisplayGetString))]
     [HarmonyPrefix]
-    private static bool InputDisplayGetString(InputAction action, int bindingIndex, ref string __result)
+    private static bool InputDisplayGetString(InputAction __0, int __1, ref string __result)
     {
-        var binding = action.bindings[bindingIndex].effectivePath;
+        // 0.4.4 named these action/bindingIndex. 0.5.x renamed them _action/_index.
+        // Harmony binds __0 and __1 by position, so either name works.
+        if (__1 < 0 || __1 >= __0.bindings.Count)
+        {
+            __result = "Unassigned";
+            return false;
+        }
+
+        var binding = __0.bindings[__1].effectivePath;
         __result = Utils.GetControlSpriteString(binding);
 
         return false;
@@ -254,28 +264,27 @@ internal static class InputPatches
     /// <summary>
     /// Use our own <see cref="VRInputSystem.InputToggleGet"/> since we might have other bindings not present in the base game
     /// </summary>
-    [HarmonyPatch(typeof(InputManager), nameof(InputManager.InputToggleGet))]
+    [HarmonyPatch(typeof(InputManager), nameof(InputManager.InputToggleGet), typeof(InputKey))]
     [HarmonyPrefix]
     private static bool InputToggleGet(ref InputKey key, ref bool __result)
     {
-        __result = VRInputSystem.Instance.InputToggleGet(key.ToString());
-
-        return false;
+        return ApplyInputToggle(key, ref __result);
     }
 
     /// <summary>
-    /// Prevent the addition of underlines in the input text
+    /// 0.5.x added InputToggleGet(InputKey, string scheme). It has to be named
+    /// separately or Harmony throws AmbiguousMatchException.
     /// </summary>
-    [HarmonyPatch(typeof(InputManager), nameof(InputManager.InputDisplayReplaceTags))]
+    [HarmonyPatch(typeof(InputManager), nameof(InputManager.InputToggleGet), typeof(InputKey), typeof(string))]
     [HarmonyPrefix]
-    private static bool NoUnderlinePatch(InputManager __instance, ref string __result, ref string _text)
+    private static bool InputToggleGetWithScheme(ref InputKey key, ref bool __result)
     {
-        _text = __instance.tagDictionary.Aggregate(_text,
-            (current, keyValuePair) => current.Replace(keyValuePair.Key,
-                __instance.InputDisplayGet(keyValuePair.Value, MenuKeybind.KeyType.InputKey, MovementDirection.Up)));
+        return ApplyInputToggle(key, ref __result);
+    }
 
-        __result = _text;
-
+    static bool ApplyInputToggle(InputKey key, ref bool result)
+    {
+        result = VRInputSystem.Instance.InputToggleGet(key.ToString());
         return false;
     }
 
@@ -290,9 +299,101 @@ internal static class InputPatches
 
         return false;
     }
+}
 
-    #region Mouse Input Patches
+/// <summary>
+/// 0.4.4 returns the replaced string. Skip the original so the underline prefix and suffix are not applied.
+/// </summary>
+[RepoXRPatch]
+internal static class InputUnderlineStringPatches
+{
+    [HarmonyPrepare]
+    static bool Prepare() => InputDisplayTags.ReturnsString();
 
+    [HarmonyPatch(typeof(InputManager), nameof(InputManager.InputDisplayReplaceTags))]
+    [HarmonyPrefix]
+    static bool Prefix(InputManager __instance, ref string __result, ref string _text)
+    {
+        __result = InputDisplayTags.Replace(__instance, _text) ?? _text;
+        return false;
+    }
+}
+
+/// <summary>
+/// 0.5.1 changed InputDisplayReplaceTags to void. A prefix must not declare __result.
+/// Substitute the tags first, then let the original store the text.
+/// </summary>
+[RepoXRPatch]
+internal static class InputUnderlineVoidPatches
+{
+    [HarmonyPrepare]
+    static bool Prepare() => InputDisplayTags.ReturnsVoid();
+
+    [HarmonyPatch(typeof(InputManager), nameof(InputManager.InputDisplayReplaceTags))]
+    [HarmonyPrefix]
+    static void Prefix(InputManager __instance, ref string _text)
+    {
+        _text = InputDisplayTags.Replace(__instance, _text) ?? _text;
+    }
+}
+
+internal static class InputDisplayTags
+{
+    internal static MethodInfo? ReplaceTagsMethod() =>
+        typeof(InputManager).GetMethod(nameof(InputManager.InputDisplayReplaceTags),
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public |
+            System.Reflection.BindingFlags.NonPublic, null,
+            [typeof(string), typeof(string), typeof(string)], null);
+
+    internal static bool ReturnsString()
+    {
+        var method = ReplaceTagsMethod();
+        return method != null && method.ReturnType == typeof(string);
+    }
+
+    internal static bool ReturnsVoid()
+    {
+        var method = ReplaceTagsMethod();
+        return method != null && method.ReturnType == typeof(void);
+    }
+
+    internal static string? Replace(string? text, IReadOnlyDictionary<string, string>? tags)
+    {
+        if (text == null || tags == null)
+            return text;
+
+        foreach (var pair in tags)
+            text = text.Replace(pair.Key, pair.Value ?? "");
+
+        return text;
+    }
+
+    internal static string? Replace(InputManager? manager, string? text)
+    {
+        if (manager?.tagDictionary == null)
+            return text;
+
+        var shown = new Dictionary<string, string>();
+        foreach (var pair in manager.tagDictionary)
+        {
+            var action = manager.GetAction(pair.Value);
+            shown[pair.Key] = action == null
+                ? "Unassigned"
+                : manager.InputDisplayGetString(action,
+                    action.GetBindingIndex(VRInputSystem.Instance.CurrentControlScheme));
+        }
+
+        return Replace(text, shown);
+    }
+}
+
+/// <summary>
+/// Controller trigger stands in for the mouse on menu widgets. Kept apart from the
+/// input-display patches so a signature change there cannot drop hover and clicks.
+/// </summary>
+[RepoXRPatch]
+internal static class InputMousePatches
+{
     [HarmonyPatch(typeof(MenuButton), nameof(MenuButton.HoverLogic))]
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> PatchHoverLogicMouseInputs(IEnumerable<CodeInstruction> instructions) =>
@@ -365,6 +466,11 @@ internal static class InputPatches
     [HarmonyPrefix]
     private static bool PreventDoublePressPatch(Button __instance)
     {
+        // Only suppress the Unity click when the VR pointer is actually handling it.
+        // Otherwise a failed ray leaves menu buttons unable to take mouse or controller clicks.
+        if (!VRSession.InVR || XRRayInteractorManager.Instance is null)
+            return true;
+
         return !__instance.TryGetComponent<MenuButton>(out _);
     }
 
@@ -391,17 +497,18 @@ internal static class InputPatches
     private static CodeMatcher PatchMouseInputs(this CodeMatcher matcher)
     {
         var matchButton = new CodeMatch(OpCodes.Call,
-            Method(typeof(UnityEngine.Input), nameof(UnityEngine.Input.GetMouseButton)));
+            Method(typeof(UnityEngine.Input), nameof(UnityEngine.Input.GetMouseButton), [typeof(int)]));
         var matchButtonDown = new CodeMatch(OpCodes.Call,
-            Method(typeof(UnityEngine.Input), nameof(UnityEngine.Input.GetMouseButtonDown)));
+            Method(typeof(UnityEngine.Input), nameof(UnityEngine.Input.GetMouseButtonDown), [typeof(int)]));
 
-        return matcher
-            .MatchForward(false, matchButton)
-            .Repeat(m => m.SetOperandAndAdvance(((Func<int, bool>)GetMouseButtonVR).Method))
-            .Start()
-            .MatchForward(false, matchButtonDown)
-            .Repeat(m => m.SetOperandAndAdvance(((Func<int, bool>)GetMouseButtonDownVR).Method));
+        matcher.MatchForward(false, matchButton);
+        if (!matcher.IsInvalid)
+            matcher.Repeat(m => m.SetOperandAndAdvance(((Func<int, bool>)GetMouseButtonVR).Method));
+
+        matcher.Start().MatchForward(false, matchButtonDown);
+        if (!matcher.IsInvalid)
+            matcher.Repeat(m => m.SetOperandAndAdvance(((Func<int, bool>)GetMouseButtonDownVR).Method));
+
+        return matcher;
     }
-
-    #endregion
 }

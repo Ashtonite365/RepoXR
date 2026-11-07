@@ -4,6 +4,7 @@ using HarmonyLib;
 using RepoXR.Managers;
 using RepoXR.Player.Camera;
 using UnityEngine;
+using UnityEngine.XR;
 using static HarmonyLib.AccessTools;
 
 namespace RepoXR.Patches;
@@ -20,6 +21,22 @@ internal static class CameraPatches
     {
         if (__instance.name is "Camera Overlay" or "Camera Main")
             value = null;
+    }
+
+    /// <summary>
+    /// Unity rejects fieldOfView on a stereo camera and logs
+    /// "Cannot set field of view on camera with name 'Camera Main' while VR is enabled."
+    /// The assignment does not change the headset projection. Skip that setter.
+    /// A flat camera, including the optional custom camera, still accepts FOV.
+    /// </summary>
+    [HarmonyPatch(typeof(Camera), nameof(Camera.fieldOfView), MethodType.Setter)]
+    [HarmonyPrefix]
+    private static bool SkipFieldOfViewOnStereoCamera(Camera __instance)
+    {
+        if (__instance == null || !XRSettings.enabled)
+            return true;
+
+        return __instance.stereoTargetEye == StereoTargetEyeMask.None;
     }
 
     /// <summary>
@@ -120,9 +137,13 @@ internal static class CameraPatches
     [HarmonyPrefix]
     private static bool GetOverrideActivePatch(PlayerLocalCamera __instance, ref bool __result)
     {
-        __result = __instance.clientPositionOverride ||
-                   (__instance.playerAvatar.isLocal && VRCameraPosition.instance.overridePositionActive);
+        if (__instance == null)
+            return true;
 
+        var position = VRCameraPosition.instance;
+        __result = CameraOverride.IsActive(__instance.clientPositionOverride, __instance.playerAvatar != null,
+            __instance.playerAvatar != null && __instance.playerAvatar.isLocal, position != null,
+            position != null && position.overridePositionActive);
         return false;
     }
 

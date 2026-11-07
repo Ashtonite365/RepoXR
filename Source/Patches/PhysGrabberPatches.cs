@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using HarmonyLib;
@@ -24,11 +25,40 @@ internal static class PhysGrabberPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> UpdatePatches(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            .MatchForward(false,
-                new CodeMatch(OpCodes.Callvirt, Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform))))
-            .Repeat(matcher => matcher.Set(OpCodes.Call, PlayerLocalCameraExtensions.GetHandOverrideTransformMethod))
-            .InstructionEnumeration();
+        var list = new List<CodeInstruction>(instructions);
+        updateUsesOverrideCall = false;
+        foreach (var instruction in list)
+        {
+            if (!IsOverrideTransformCall(instruction))
+                continue;
+
+            instruction.opcode = OpCodes.Call;
+            instruction.operand = PlayerLocalCameraExtensions.GetHandOverrideTransformMethod;
+            updateUsesOverrideCall = true;
+        }
+
+        Logger.LogInfo(updateUsesOverrideCall
+            ? "PhysGrabber.Update hand aim swapped GetOverrideTransform."
+            : "PhysGrabber.Update has no GetOverrideTransform. Hand aim follows the hand for each call.");
+        return list;
+    }
+
+    static bool updateUsesOverrideCall;
+
+    [HarmonyPatch(typeof(PhysGrabber), nameof(PhysGrabber.Update))]
+    [HarmonyPrefix]
+    static void HandAimPrefix(PhysGrabber __instance, out AimRedirect __state)
+    {
+        __state = updateUsesOverrideCall || __instance is not { isLocal: true }
+            ? AimRedirect.None
+            : AimRedirect.ForGrabTurn(__instance);
+    }
+
+    [HarmonyPatch(typeof(PhysGrabber), nameof(PhysGrabber.Update))]
+    [HarmonyPostfix]
+    static void HandAimPostfix(AimRedirect __state)
+    {
+        __state?.Restore();
     }
 
     /// <summary>
@@ -38,7 +68,7 @@ internal static class PhysGrabberPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> PushPullSlowdownPatch(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
+        return GameSignatures.EditOrOriginal(instructions, "PhysGrabber push/pull slowdown", matcher => matcher
             .MatchForward(false, new CodeMatch(OpCodes.Ldc_R4, 0.2f))
             .SetOperandAndAdvance(0.1f)
             .Insert(
@@ -54,8 +84,7 @@ internal static class PhysGrabberPatches
                 new CodeInstruction(OpCodes.Callvirt,
                     Method(typeof(InputManager), nameof(InputManager.KeyPullAndPush))),
                 new CodeInstruction(OpCodes.Mul)
-            )
-            .InstructionEnumeration();
+            ));
     }
 
     /// <summary>
@@ -92,13 +121,22 @@ internal static class PhysGrabberPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> RayCheckPatches(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            // Replace grabber checks from camera with checks from hand
-            .MatchForward(false,
-                new CodeMatch(OpCodes.Callvirt,
-                    Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform))))
-            .Set(OpCodes.Call, PlayerLocalCameraExtensions.GetHandOverrideTransformMethod)
-            .InstructionEnumeration();
+        return GameSignatures.EditOrOriginal(instructions, "PhysGrabber grab ray", matcher =>
+        {
+            matcher.MatchForward(false, new CodeMatch(IsOverrideTransformCall));
+            if (matcher.IsInvalid)
+                throw new InvalidOperationException("GetOverrideTransform was not called");
+
+            return matcher.Set(OpCodes.Call, PlayerLocalCameraExtensions.GetHandOverrideTransformMethod);
+        });
+    }
+
+    static bool IsOverrideTransformCall(CodeInstruction instruction)
+    {
+        return (instruction.opcode == OpCodes.Call || instruction.opcode == OpCodes.Callvirt)
+               && instruction.operand is MethodInfo method
+               && method.DeclaringType == typeof(PlayerLocalCamera)
+               && method.Name == nameof(PlayerLocalCamera.GetOverrideTransform);
     }
 
     /// <summary>
@@ -108,26 +146,22 @@ internal static class PhysGrabberPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> ObjectTurningPatches(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            // Use VR controls for rotation instead of mouse inputs
-            .MatchForward(false, new CodeMatch(OpCodes.Ldstr, "Mouse X"))
-            .RemoveInstructions(10)
-            .Insert(
-                // TESTER: Check these operands in Debug vs Release builds
-                new CodeInstruction(OpCodes.Ldloca_S, Plugin.GameDebugBuild ? 13 : 5), // Mouse X
-                new CodeInstruction(OpCodes.Ldloca_S, Plugin.GameDebugBuild ? 14 : 6), // Mouse Y
-                new CodeInstruction(OpCodes.Call, Method(typeof(PhysGrabberPatches), nameof(GetRotationInput)))
-            )
-            .InstructionEnumeration();
+        var list = new List<CodeInstruction>(instructions);
+        var replaced = MouseAxisRewrite.Replace(list,
+            Method(typeof(PhysGrabberPatches), nameof(StickX)),
+            Method(typeof(PhysGrabberPatches), nameof(StickY)));
+        if (replaced == 0)
+            Logger.LogInfo(
+                "PhysGrabber.ObjectTurning has no Mouse X/Y axis read on this build. Turning stays on the game's own input.");
+        else
+            Logger.LogInfo($"PhysGrabber.ObjectTurning reads the controller for {replaced} mouse axis call(s).");
+
+        return list;
     }
 
-    private static void GetRotationInput(out float x, out float y)
-    {
-        var input = Actions.Instance["Rotation"].ReadValue<Vector2>();
+    static float StickX() => Actions.Instance["Rotation"].ReadValue<Vector2>().x;
 
-        x = input.x;
-        y = input.y;
-    }
+    static float StickY() => Actions.Instance["Rotation"].ReadValue<Vector2>().y;
 
     /// <summary>
     /// Allow a custom override to disable object turning
@@ -136,22 +170,20 @@ internal static class PhysGrabberPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> DisableTurningPatch(IEnumerable<CodeInstruction> instructions)
     {
-        var matcher = new CodeMatcher(instructions)
-            .MatchForward(false, new CodeMatch(OpCodes.Call, Method(typeof(SemiFunc), nameof(SemiFunc.InputHold))))
-            .Advance(1);
+        return GameSignatures.EditOrOriginal(instructions, "PhysGrabber disable turning", matcher =>
+        {
+            matcher.MatchForward(false, new CodeMatch(OpCodes.Call, Method(typeof(SemiFunc), nameof(SemiFunc.InputHold))))
+                .Advance(1);
 
-        var jmp = matcher.Instruction;
-
-        matcher.Advance(1).InsertAndAdvance(
-            new CodeInstruction(OpCodes.Call, PropertyGetter(typeof(VRSession), nameof(VRSession.Instance))),
-            new CodeInstruction(OpCodes.Callvirt, PropertyGetter(typeof(VRSession), nameof(VRSession.Player))),
-            new CodeInstruction(OpCodes.Ldfld, Field(typeof(VRPlayer), nameof(VRPlayer.disableRotateTimer))),
-            new CodeInstruction(OpCodes.Ldc_R4, 0f),
-            new CodeInstruction(OpCodes.Bgt_Un_S, jmp.operand)
-        );
-
-        return matcher
-            .InstructionEnumeration();
+            var jmp = matcher.Instruction;
+            return matcher.Advance(1).InsertAndAdvance(
+                new CodeInstruction(OpCodes.Call, PropertyGetter(typeof(VRSession), nameof(VRSession.Instance))),
+                new CodeInstruction(OpCodes.Callvirt, PropertyGetter(typeof(VRSession), nameof(VRSession.Player))),
+                new CodeInstruction(OpCodes.Ldfld, Field(typeof(VRPlayer), nameof(VRPlayer.disableRotateTimer))),
+                new CodeInstruction(OpCodes.Ldc_R4, 0f),
+                new CodeInstruction(OpCodes.Bgt_Un_S, jmp.operand)
+            );
+        });
     }
 
     /// <summary>
@@ -178,42 +210,45 @@ internal static class PhysGrabberPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> ForceHoldPatch(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            .MatchForward(false,
-                new CodeMatch(OpCodes.Ldfld,
-                    Field(typeof(GameplayManager), nameof(GameplayManager.itemUnequipAutoHold))))
-            .Advance(-2)
-            .InsertAndAdvance(
-                new CodeInstruction(OpCodes.Ldarg_0),
-                new CodeInstruction(OpCodes.Ldfld, Field(typeof(PhysGrabber), nameof(PhysGrabber.overrideGrabTimer))),
-                new CodeInstruction(OpCodes.Call, ((Func<bool, float, bool>)ShouldToggleGrabOff).Method)
-            )
-            .InstructionEnumeration();
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static bool ShouldToggleGrabOff(bool grabHeld, float grabTimer) => grabHeld && grabTimer <= 0;
+        // 0.5.1 moved the auto-hold check. The 0.4.4 insert compiled into a call the
+        // verifier rejected (PhysGrabber.Update IL_069b) and that aborted every other
+        // grabber patch. Leave Update's grab toggle on the game's own path.
+        _ = instructions;
+        return instructions;
     }
 }
 
 [RepoXRPatch(RepoXRPatchTarget.Universal)]
 internal static class PhysGrabberUniversalPatches
 {
+    static bool turningUsesOverrideCall;
+
     [HarmonyPatch(typeof(PhysGrabber), nameof(PhysGrabber.ObjectTurning))]
     [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> ObjectTurningPatches(IEnumerable<CodeInstruction> instructions)
+    private static IEnumerable<CodeInstruction> HandAimTurningSwap(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            // Replace camera transform with hand transform (local player)
-            .MatchForward(false,
-                new CodeMatch(OpCodes.Callvirt,
-                    Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform))))
-            .Set(OpCodes.Call, PlayerLocalCameraExtensions.GetHandOverrideTransformMethod)
-            // Replace camera transform with hand transform (remote player)
-            .MatchForward(false,
-                new CodeMatch(OpCodes.Callvirt,
-                    Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform))))
-            .Set(OpCodes.Call, PlayerLocalCameraExtensions.GetHandOverrideTransformMethod)
-            .InstructionEnumeration();
+        // 0.4.4 called GetOverrideTransform here. Swap that call when it is still present.
+        // 0.5.1 removed it; the prefix below aims the camera for the length of the call.
+        var edited = SwapOverrideTransform(instructions, PlayerLocalCameraExtensions.GetHandOverrideTransformMethod,
+            out turningUsesOverrideCall);
+        Logger.LogInfo(turningUsesOverrideCall
+            ? "PhysGrabber.ObjectTurning hand aim swapped GetOverrideTransform."
+            : "PhysGrabber.ObjectTurning hand aim follows the hand for each call.");
+        return edited;
+    }
+
+    [HarmonyPatch(typeof(PhysGrabber), nameof(PhysGrabber.ObjectTurning))]
+    [HarmonyPrefix]
+    private static void HandAimTurningPrefix(PhysGrabber __instance, out AimRedirect __state)
+    {
+        __state = turningUsesOverrideCall ? AimRedirect.None : AimRedirect.ForGrabTurn(__instance);
+    }
+
+    [HarmonyPatch(typeof(PhysGrabber), nameof(PhysGrabber.ObjectTurning))]
+    [HarmonyPostfix]
+    private static void HandAimTurningPostfix(AimRedirect __state)
+    {
+        __state?.Restore();
     }
 
     /// <summary>
@@ -223,43 +258,74 @@ internal static class PhysGrabberUniversalPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> GrabFromHandPatch(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            // Replace camera transform with hand transform
-            .MatchForward(false,
+        return GameSignatures.EditOrOriginal(instructions, "PhysGrabber grab-from-hand", matcher =>
+        {
+            matcher.MatchForward(false,
                 new CodeMatch(OpCodes.Callvirt,
-                    Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform))))
-            .Set(OpCodes.Call, PlayerLocalCameraExtensions.GetHandOverrideTransformMethod)
-            .InstructionEnumeration();
+                    Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform))));
+            if (matcher.IsInvalid)
+                throw new InvalidOperationException("GetOverrideTransform was not called");
+
+            return matcher.Set(OpCodes.Call, PlayerLocalCameraExtensions.GetHandOverrideTransformMethod);
+        });
     }
 
     /// <summary>
-    /// Make our tumble climb follow our hand rotation instead of the camera rotation
+    /// Replace the camera quaternion used by the first Quaternion.Angle call. The previous
+    /// edit deleted the instructions in front of that call and left an unverifiable call
+    /// (GrabStateClimb IL_0409). This insert only consumes the quaternion already on the
+    /// stack and pushes the hand rotation, so the method stays verifiable.
     /// </summary>
     [HarmonyPatch(typeof(PhysGrabber), nameof(PhysGrabber.GrabStateClimb))]
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> HandBasedTumbleClimbPatch(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            .MatchForward(false,
-                new CodeMatch(OpCodes.Call, Method(typeof(Quaternion), nameof(Quaternion.Angle))))
-            .Advance(-5)
-            .SetAndAdvance(OpCodes.Call, ((Func<PhysGrabber, Quaternion>)GetRotation).Method)
-            .RemoveInstruction()
-            .InstructionEnumeration();
-
-        static Quaternion GetRotation(PhysGrabber grabber)
+        var list = new List<CodeInstruction>(instructions);
+        var matcher = new CodeMatcher(list);
+        matcher.MatchForward(false, new CodeMatch(IsQuaternionAngle));
+        if (matcher.IsInvalid)
         {
-            if (grabber.playerAvatar.isLocal)
-                return VRSession.InVR
-                    ? VRSession.Instance.Player.MainHand.rotation * Quaternion.Euler(0, 180, 0)
-                    : grabber.climbStickTransform.rotation;
-
-            if (!NetworkSystem.instance)
-                return grabber.climbStickTransform.rotation;
-
-            return NetworkSystem.instance.GetNetworkPlayer(grabber.playerAvatar, out var networkPlayer)
-                ? networkPlayer.PrimaryHand.rotation * Quaternion.Euler(0, 180, 0)
-                : grabber.climbStickTransform.rotation;
+            Logger.LogInfo(
+                "PhysGrabber.GrabStateClimb has no Quaternion.Angle on this build. Hand rotation is applied through ClimbOrbitRotationGet when that method exists.");
+            return list;
         }
+
+        matcher.Insert(
+            new CodeInstruction(OpCodes.Ldarg_0),
+            new CodeInstruction(OpCodes.Call, Method(typeof(AimRedirect), nameof(AimRedirect.ClimbRotation))));
+        Logger.LogInfo("PhysGrabber.GrabStateClimb hand rotation applies at Quaternion.Angle.");
+        return matcher.InstructionEnumeration();
+    }
+
+    static bool IsQuaternionAngle(CodeInstruction instruction)
+    {
+        return (instruction.opcode == OpCodes.Call || instruction.opcode == OpCodes.Callvirt)
+               && instruction.operand is MethodInfo method
+               && method.DeclaringType == typeof(Quaternion)
+               && method.Name == nameof(Quaternion.Angle)
+               && method.GetParameters().Length == 2;
+    }
+
+    static IEnumerable<CodeInstruction> SwapOverrideTransform(IEnumerable<CodeInstruction> instructions,
+        MethodInfo replacement, out bool swapped)
+    {
+        var list = new List<CodeInstruction>(instructions);
+        swapped = false;
+        foreach (var ins in list)
+        {
+            if (ins.operand is not MethodInfo method)
+                continue;
+            if (method.DeclaringType != typeof(PlayerLocalCamera) ||
+                method.Name != nameof(PlayerLocalCamera.GetOverrideTransform))
+                continue;
+            if (ins.opcode != OpCodes.Call && ins.opcode != OpCodes.Callvirt)
+                continue;
+
+            ins.opcode = OpCodes.Call;
+            ins.operand = replacement;
+            swapped = true;
+        }
+
+        return list;
     }
 }

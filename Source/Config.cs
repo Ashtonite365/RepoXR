@@ -63,7 +63,7 @@ public class Config(string assemblyPath, ConfigFile file)
     [ConfigDescriptor(customName: "Full Body Tracking", trueText: "Enabled", falseText: "Disabled")]
     public ConfigEntry<bool> EnableFullBodyTracking { get; } = file.Create("Gameplay", nameof(EnableFullBodyTracking),
         false,
-        "Optional 3-point body tracking from extra SteamVR, Vive, or SlimeVR trackers. Off by default. The tracker profile is registered at startup, so this can be changed in the pause menu during a session. While off, tracker poses are not applied. Headset and controller VR keeps working.");
+        "Optional 3-point body tracking from extra SteamVR, Vive, or SlimeVR trackers. Off by default. The OpenXR tracker profile is registered only when this is on at launch. Turning it on in the pause menu applies poses immediately if that profile was registered, and on the next launch otherwise. While off, tracker poses are not applied. Headset and controller VR keeps working.");
 
     [ConfigDescriptor(customName: "Body Slot 1")]
     public ConfigEntry<BodyRole> FbtSlot1Role { get; } = file.Create("Gameplay", nameof(FbtSlot1Role), BodyRole.Waist,
