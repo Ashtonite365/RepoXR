@@ -18,6 +18,7 @@ internal static class MenuPlacement
 
     static int presentedId;
     static bool loggedWaiting;
+    static bool loggedMiss;
 
     internal static RectTransform Current { get; private set; }
     internal static RectTransform Display { get; private set; }
@@ -110,20 +111,20 @@ internal static class MenuPlacement
         image.texture = texture;
         image.raycastTarget = false;
 
-        if (!TrySceneAnchor(camera, out var anchorName, out var truckPosition, out var standPosition, out var left,
-                out var place, out var alongLeft))
+        if (!TrySceneAnchor(camera, out var detail, out var place, out var rotation))
         {
-            Logger.LogInfo("Menu plane was not placed. No truck anchor was found in the main menu scene.");
+            if (!loggedMiss)
+            {
+                loggedMiss = true;
+                Logger.LogInfo("Menu plane was not placed. " + detail);
+            }
+
             UnityEngine.Object.Destroy(displayObject);
             UnityEngine.Object.Destroy(capture);
             return false;
         }
 
-        var toPlane = place - standPosition;
-        toPlane.y = 0f;
-        if (toPlane.sqrMagnitude < 0.01f)
-            toPlane = -left;
-        display.SetPositionAndRotation(place, Quaternion.LookRotation(toPlane.normalized, Vector3.up));
+        display.SetPositionAndRotation(place, rotation);
         display.SetParent(null, true);
 
         Current = rect;
@@ -142,15 +143,14 @@ internal static class MenuPlacement
             " pagePivot=" + (pageRect != null ? Format(pageRect.pivot) : "(none)") +
             " pageAnchorMin=" + (pageRect != null ? Format(pageRect.anchorMin) : "(none)") +
             " pageAnchorMax=" + (pageRect != null ? Format(pageRect.anchorMax) : "(none)") +
-            " anchor='" + anchorName +
-            "' truckPos=" + Format(truckPosition) +
-            " standPos=" + Format(standPosition) +
-            " left=" + Format(left) +
-            " alongLeft=" + alongLeft.ToString("0.###", CultureInfo.InvariantCulture) +
-            " leftOfTruck=" + MenuTarget.IsLeftOfTruck(alongLeft) +
+            " " + detail +
             " headLocked=False planePos=" + Format(display.position) +
+            " planeForward=" + Format(display.forward) +
+            " planeRot=" + Format(display.eulerAngles) +
             " planeViewport=" + Format(view) +
             " planeInView=" + inView +
+            " viewportIsNotRenderProof=True" +
+            " captureTex=" + texture.width + "x" + texture.height +
             " cameraPos=" + Format(camera.transform.position) +
             " cameraFwd=" + Format(camera.transform.forward));
         ReleaseDesktopMirror(canvas);
@@ -178,87 +178,185 @@ internal static class MenuPlacement
         return u >= 0f && u <= 1f && v >= 0f && v <= 1f;
     }
 
-    static bool TrySceneAnchor(Camera camera, out string anchorName, out Vector3 truckPosition,
-        out Vector3 standPosition, out Vector3 left, out Vector3 place, out float alongLeft)
+    static bool TrySceneAnchor(Camera camera, out string detail, out Vector3 place, out Quaternion rotation)
     {
-        anchorName = "";
-        truckPosition = standPosition = left = place = default;
-        alongLeft = 0f;
-        standPosition = camera.transform.position;
-        var viewRight = camera.transform.right;
-        viewRight.y = 0f;
-        var flatLeft = MenuTarget.CameraViewLeft(viewRight.x, viewRight.z);
-        left = new Vector3(flatLeft.x, flatLeft.y, flatLeft.z);
-        if (!TryVisibleTruck(camera, out anchorName, out var body))
-            return false;
+        detail = "";
+        place = default;
+        rotation = Quaternion.identity;
+        var origin = camera.transform.position;
+        var forward = camera.transform.forward;
+        var seen = new System.Collections.Generic.List<MeshNote>();
+        foreach (var renderer in UnityEngine.Object.FindObjectsOfType<Renderer>())
+        {
+            if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy)
+                continue;
+            if (renderer is ParticleSystemRenderer)
+                continue;
+            if (renderer.name.StartsWith("RepoFBT", StringComparison.Ordinal))
+                continue;
 
-        truckPosition = body.center;
-        var reach = ExtentAlong(body, left);
-        var gap = reach + WidthMeters * 0.5f + 0.5f;
-        var spot = MenuTarget.LeftOfTruck(truckPosition.x, truckPosition.z, left.x, left.z, gap, standPosition.y);
-        place = new Vector3(spot.x, spot.y, spot.z);
-        alongLeft = Vector3.Dot(place - truckPosition, left);
+            var bounds = renderer.bounds;
+            var largest = Mathf.Max(bounds.size.x, Mathf.Max(bounds.size.y, bounds.size.z));
+            if (largest < 1.2f || largest > 20f)
+                continue;
+
+            var center = bounds.center;
+            var offset = MenuTarget.ViewOffset(origin.x, origin.z, forward.x, forward.z, center.x, center.z);
+            var view = camera.WorldToViewportPoint(center);
+            var inFrame = view.z > 0.4f && view.z < 22f && view.x > -0.25f && view.x < 1.25f && view.y > -0.35f &&
+                          view.y < 1.35f;
+            var pass = inFrame && MenuTarget.InViewCone(offset.ahead, offset.lateral);
+            var parentName = renderer.transform.parent != null ? renderer.transform.parent.name : "";
+            seen.Add(new MeshNote
+            {
+                Name = renderer.name,
+                Parent = parentName,
+                Center = center,
+                Size = bounds.size,
+                Ahead = offset.ahead,
+                Lateral = offset.lateral,
+                Viewport = view,
+                Pass = pass,
+                Transform = renderer.transform,
+                Bounds = bounds
+            });
+        }
+
+        MeshNote? chosen = null;
+        MeshNote? named = null;
+        MeshNote? rejected = null;
+        var largestVolume = -1f;
+        var namedVolume = -1f;
+        var rejectedVolume = -1f;
+        foreach (var note in seen)
+        {
+            var volume = note.Size.x * note.Size.y * note.Size.z;
+            if (!note.Pass)
+            {
+                if (volume <= rejectedVolume)
+                    continue;
+                rejectedVolume = volume;
+                rejected = note;
+                continue;
+            }
+
+            if (volume > largestVolume)
+            {
+                largestVolume = volume;
+                chosen = note;
+            }
+
+            var truckNamed = note.Name.IndexOf("truck", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                             note.Parent.IndexOf("truck", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (!truckNamed || volume <= namedVolume)
+                continue;
+            namedVolume = volume;
+            named = note;
+        }
+
+        if (named != null && namedVolume >= largestVolume * 0.5f)
+            chosen = named;
+
+        var animated = UnityEngine.Object.FindObjectOfType<TruckMenuAnimated>();
+        var controllerText = DescribeController(camera, animated);
+        if (chosen == null)
+        {
+            detail = "No renderer bounds were in the camera view. " + controllerText + " " + Describe(seen);
+            return false;
+        }
+
+        var body = chosen.Bounds;
+        foreach (var note in seen)
+        {
+            if (!note.Pass || note == chosen)
+                continue;
+            if ((note.Center - chosen.Center).sqrMagnitude > 9f)
+                continue;
+            body.Encapsulate(note.Bounds);
+        }
+
+        var toCamera = origin - body.center;
+        toCamera.y = 0f;
+        var meshForward = chosen.Transform.forward;
+        meshForward.y = 0f;
+        var forwardSource = "mesh";
+        if (meshForward.sqrMagnitude < 0.0001f)
+        {
+            meshForward = toCamera;
+            forwardSource = "toward camera";
+        }
+        else if (Vector3.Dot(meshForward, toCamera) < 0f)
+        {
+            meshForward = -meshForward;
+            forwardSource = "mesh flipped toward camera";
+        }
+
+        meshForward.Normalize();
+        var meshRight = Vector3.Cross(Vector3.up, meshForward);
+        var pose = MenuTarget.SketchPose(body.center.x, body.center.z, meshForward.x, meshForward.z, meshRight.x,
+            meshRight.z, ExtentAlong(body, meshForward), ExtentAlong(body, meshRight), origin.y);
+        place = new Vector3(pose.x, pose.y, pose.z);
+        var face = new Vector3(pose.faceX, 0f, pose.faceZ);
+        if (face.sqrMagnitude < 0.0001f)
+            face = -meshRight;
+        rotation = Quaternion.LookRotation(-face.normalized, Vector3.up);
+        var centerView = camera.WorldToViewportPoint(body.center);
+        detail = "anchor='" + chosen.Name +
+                 "' parent='" + chosen.Parent +
+                 "' truckPos=" + Format(body.center) +
+                 " bounds=" + Format(body.size) +
+                 " centerViewport=" + Format(centerView) +
+                 " ahead=" + chosen.Ahead.ToString("0.###", CultureInfo.InvariantCulture) +
+                 " lateral=" + chosen.Lateral.ToString("0.###", CultureInfo.InvariantCulture) +
+                 " forwardSource=" + forwardSource +
+                 " truckFwd=" + Format(meshForward) +
+                 " face=" + Format(face.normalized) +
+                 " raise=" + MenuTarget.SketchRaiseMeters.ToString("0.###", CultureInfo.InvariantCulture) +
+                 " " + controllerText +
+                 (rejected == null
+                     ? ""
+                     : " rejected='" + rejected.Name +
+                       "' rejectedCenter=" + Format(rejected.Center) +
+                       " rejectedAhead=" + rejected.Ahead.ToString("0.###", CultureInfo.InvariantCulture) +
+                       " rejectedLateral=" + rejected.Lateral.ToString("0.###", CultureInfo.InvariantCulture) +
+                       " rejectedViewport=" + Format(rejected.Viewport));
         return true;
     }
 
-    static bool TryVisibleTruck(Camera camera, out string anchorName, out Bounds body)
+    static string DescribeController(Camera camera, TruckMenuAnimated? animated)
     {
-        var label = "";
-        var found = new Bounds();
-        var any = false;
+        if (animated == null)
+            return "controller=missing";
+
+        var position = animated.transform.position;
         var forward = camera.transform.forward;
-        var origin = camera.transform.position;
+        var offset = MenuTarget.ViewOffset(camera.transform.position.x, camera.transform.position.z, forward.x,
+            forward.z, position.x, position.z);
+        var view = camera.WorldToViewportPoint(position);
+        return "controller='" + animated.name +
+               "' controllerPos=" + Format(position) +
+               " controllerAhead=" + offset.ahead.ToString("0.###", CultureInfo.InvariantCulture) +
+               " controllerLateral=" + offset.lateral.ToString("0.###", CultureInfo.InvariantCulture) +
+               " controllerViewport=" + Format(view) +
+               " controllerInView=" + MenuTarget.InViewCone(offset.ahead, offset.lateral);
+    }
 
-        void Take(Renderer renderer, string group)
+    static string Describe(System.Collections.Generic.List<MeshNote> seen)
+    {
+        seen.Sort((a, b) => (b.Size.x * b.Size.y * b.Size.z).CompareTo(a.Size.x * a.Size.y * a.Size.z));
+        var text = "candidates=" + seen.Count;
+        var shown = 0;
+        foreach (var note in seen)
         {
-            if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy)
-                return;
-            var bounds = renderer.bounds;
-            if (bounds.size.sqrMagnitude < 0.25f)
-                return;
-            var ahead = MenuTarget.Ahead(origin.x, origin.z, forward.x, forward.z, bounds.center.x, bounds.center.z);
-            if (!MenuTarget.InFrontOfCamera(ahead, 40f))
-                return;
-
-            if (!any)
-            {
-                found = bounds;
-                label = group;
-                any = true;
-            }
-            else
-                found.Encapsulate(bounds);
+            if (shown >= 4)
+                break;
+            shown++;
+            text += " [" + note.Name + " pass=" + note.Pass + " center=" + Format(note.Center) + " ahead=" +
+                    note.Ahead.ToString("0.###", CultureInfo.InvariantCulture) + " lateral=" +
+                    note.Lateral.ToString("0.###", CultureInfo.InvariantCulture) + "]";
         }
 
-        var animated = UnityEngine.Object.FindObjectOfType<TruckMenuAnimated>();
-        if (animated != null)
-        {
-            foreach (var renderer in animated.GetComponentsInChildren<Renderer>())
-                Take(renderer, animated.name + " mesh");
-        }
-
-        if (!any)
-        {
-            foreach (var renderer in UnityEngine.Object.FindObjectsOfType<Renderer>())
-            {
-                if (renderer == null)
-                    continue;
-                var parentName = renderer.transform.parent != null ? renderer.transform.parent.name : "";
-                if (renderer.name.IndexOf("truck", StringComparison.OrdinalIgnoreCase) < 0 &&
-                    parentName.IndexOf("truck", StringComparison.OrdinalIgnoreCase) < 0)
-                    continue;
-                Take(renderer, "truck mesh");
-            }
-        }
-
-        if (!any && animated != null)
-            Logger.LogInfo(
-                "Menu plane was not placed. '" + animated.name + "' is at " + Format(animated.transform.position) +
-                " and none of its renderers are in front of the camera.");
-
-        anchorName = label;
-        body = found;
-        return any;
+        return text;
     }
 
     static float ExtentAlong(Bounds bounds, Vector3 direction)
@@ -266,6 +364,20 @@ internal static class MenuPlacement
         return bounds.extents.x * Mathf.Abs(direction.x)
                + bounds.extents.y * Mathf.Abs(direction.y)
                + bounds.extents.z * Mathf.Abs(direction.z);
+    }
+
+    sealed class MeshNote
+    {
+        internal string Name = "";
+        internal string Parent = "";
+        internal Vector3 Center;
+        internal Vector3 Size;
+        internal float Ahead;
+        internal float Lateral;
+        internal Vector3 Viewport;
+        internal bool Pass;
+        internal Transform Transform = null!;
+        internal Bounds Bounds;
     }
 
     static void ReleaseDesktopMirror(Canvas menuCanvas)

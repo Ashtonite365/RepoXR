@@ -96,4 +96,63 @@ internal static class MenuTarget
         (pointX - camX) * fwdX + (pointZ - camZ) * fwdZ;
 
     internal static bool InFrontOfCamera(float ahead, float maxDistance) => ahead > 1f && ahead < maxDistance;
+
+    /// <summary>
+    /// The 1.3.19 gate used <see cref="Ahead"/> alone. The controller mesh at
+    /// (-17.754, 4.503) is only about 1.8 m along the camera's horizontal forward
+    /// and about 18 m to the side, so that gate accepted it.
+    /// </summary>
+    internal static (float ahead, float lateral) ViewOffset(float camX, float camZ, float fwdX, float fwdZ,
+        float pointX, float pointZ)
+    {
+        var mag = MathF.Sqrt(fwdX * fwdX + fwdZ * fwdZ);
+        if (mag < 0.01f)
+            return (0f, 999f);
+
+        var fx = fwdX / mag;
+        var fz = fwdZ / mag;
+        var dx = pointX - camX;
+        var dz = pointZ - camZ;
+        var ahead = dx * fx + dz * fz;
+        var sideX = dx - fx * ahead;
+        var sideZ = dz - fz * ahead;
+        return (ahead, MathF.Sqrt(sideX * sideX + sideZ * sideZ));
+    }
+
+    internal static bool InViewCone(float ahead, float lateral) =>
+        ahead > 0.5f && ahead < 18f && lateral < 8f && lateral < ahead * 1.25f;
+
+    internal const float SketchYawDegrees = 21.6f;
+    internal const float SketchRaiseMeters = 0.4f;
+    internal const float SketchForwardGap = 0.7f;
+    internal const float SketchRightFraction = 0.24f;
+    internal const float MaxHalfExtent = 4f;
+
+    /// <summary>
+    /// Overhead pose from the sketch's right-hand truck. Forward is the truck's green arrow.
+    /// The menu sits just past the nose, slightly to the truck's right, and its visible face
+    /// points toward the truck's left, yawed <see cref="SketchYawDegrees"/> toward forward.
+    /// Extents are capped so a controller-sized bounds cannot push the plane tens of metres away.
+    /// </summary>
+    internal static (float x, float y, float z, float faceX, float faceZ) SketchPose(
+        float centerX, float centerZ, float forwardX, float forwardZ, float rightX, float rightZ,
+        float halfForward, float halfRight, float eyeY)
+    {
+        if (halfForward > MaxHalfExtent)
+            halfForward = MaxHalfExtent;
+        if (halfRight > MaxHalfExtent)
+            halfRight = MaxHalfExtent;
+
+        var rightShift = halfRight * 2f * SketchRightFraction;
+        if (rightShift > 1.2f)
+            rightShift = 1.2f;
+
+        var along = halfForward + SketchForwardGap;
+        var x = centerX + forwardX * along + rightX * rightShift;
+        var z = centerZ + forwardZ * along + rightZ * rightShift;
+        var yaw = SketchYawDegrees * MathF.PI / 180f;
+        var faceX = -rightX * MathF.Cos(yaw) + forwardX * MathF.Sin(yaw);
+        var faceZ = -rightZ * MathF.Cos(yaw) + forwardZ * MathF.Sin(yaw);
+        return (x, eyeY + SketchRaiseMeters, z, faceX, faceZ);
+    }
 }

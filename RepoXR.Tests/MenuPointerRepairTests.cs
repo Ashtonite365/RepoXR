@@ -163,6 +163,21 @@ public class MenuPointerRepairTests
         Assert.False(RepoXR.UI.MenuTarget.InFrontOfCamera(behind, 40f));
         var ahead = RepoXR.UI.MenuTarget.Ahead(0f, 2f, 0f, 1f, 1f, 8f);
         Assert.True(RepoXR.UI.MenuTarget.InFrontOfCamera(ahead, 40f));
+        var oldGate = RepoXR.UI.MenuTarget.Ahead(-0.022f, 1.992f, 0.034f, 0.859f, -17.754f, 4.503f);
+        Assert.True(RepoXR.UI.MenuTarget.InFrontOfCamera(oldGate, 40f));
+        var controller = RepoXR.UI.MenuTarget.ViewOffset(-0.022f, 1.992f, 0.034f, 0.859f, -17.754f, 4.503f);
+        Assert.True(controller.lateral > 15f);
+        Assert.False(RepoXR.UI.MenuTarget.InViewCone(controller.ahead, controller.lateral));
+        var truck = RepoXR.UI.MenuTarget.ViewOffset(0f, 2f, 0f, 1f, 2f, 8f);
+        Assert.True(RepoXR.UI.MenuTarget.InViewCone(truck.ahead, truck.lateral));
+        var pose = RepoXR.UI.MenuTarget.SketchPose(0f, 0f, 0f, 1f, 1f, 0f, 2f, 1f, 2.1f);
+        Assert.Equal(0.48f, pose.x, 2);
+        Assert.Equal(2.5f, pose.y, 2);
+        Assert.Equal(2.7f, pose.z, 2);
+        Assert.True(pose.faceX < -0.9f);
+        Assert.True(pose.faceZ > 0.3f);
+        var capped = RepoXR.UI.MenuTarget.SketchPose(0f, 0f, 0f, 1f, 1f, 0f, 9f, 1f, 2.1f);
+        Assert.Equal(4.7f, capped.z, 2);
     }
 
     public static float Axis() => 1f;

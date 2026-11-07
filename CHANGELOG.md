@@ -1,3 +1,8 @@
+# 1.3.20 (RepoFBT)
+
+**Fixes**:
+- The 1.3.19 line is `anchor='CONTROLLER mesh' truckPos=(-17.754,0.501,4.503) planePos=(-26.806,2.107,3.467) planeViewport=(-26.145,8.26,0.36) cameraFwd=(0.034,-0.511,0.859)`. That center is 1.8 m along the camera's horizontal forward and 17.8 m to the side. The gate only tested the forward component, so it passed, and the plane was then pushed another 9 m along camera-left. `planeViewport` x is -26 in the same world space as the camera. The pose is now the sketch's right-hand truck: just past the nose of a mesh whose bounds are in the view, slightly to the truck's right, yawed 21.6° so the face points toward the truck's left and a little forward, and 0.4 m above the camera height. The pose is taken once. Extents are capped at 4 m. The log records the mesh, its viewport, the sideways distance, the facing, and the controller position that was not used. A viewport point is not evidence the texture was drawn.
+
 # 1.3.19 (RepoFBT)
 
 **Fixes**:
