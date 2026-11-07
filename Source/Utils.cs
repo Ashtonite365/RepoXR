@@ -181,10 +181,10 @@ internal static class Utils
     /// <summary>
     /// Resolve a translation key to it's localized value
     /// </summary>
-    public static LocalizedAsset L(string name)
+    public static LocalizedAsset? L(string name)
     {
         var fromBundle = AssetCollection.FindLocalizedInBundle(name);
-        if (fromBundle != null)
+        if (fromBundle != null || AssetCollection.LocalizationCatalogFailed)
             return fromBundle;
 
         try

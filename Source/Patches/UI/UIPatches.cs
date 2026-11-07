@@ -17,21 +17,6 @@ namespace RepoXR.Patches.UI;
 internal static class UIPatches
 {
     /// <summary>
-    /// Disable menu cursor
-    /// </summary>
-    [HarmonyPatch(typeof(MenuCursor), nameof(MenuCursor.Update))]
-    [HarmonyPrefix]
-    private static bool MenuCursorVRPatch(MenuCursor __instance)
-    {
-        // Keep the game cursor until the controller ray exists. Hiding it first leaves the menu with no pointer.
-        if (XRRayInteractorManager.Instance is null)
-            return true;
-
-        __instance.gameObject.SetActive(false);
-        return false;
-    }
-
-    /// <summary>
     /// Disable the menu page intro animation
     /// </summary>
     [HarmonyPatch(typeof(MenuPageMain), nameof(MenuPageMain.Start))]

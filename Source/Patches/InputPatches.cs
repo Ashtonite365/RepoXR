@@ -314,7 +314,7 @@ internal static class InputUnderlineStringPatches
     [HarmonyPrefix]
     static bool Prefix(InputManager __instance, ref string __result, ref string _text)
     {
-        __result = InputDisplayTags.Replace(__instance, _text);
+        __result = InputDisplayTags.Replace(__instance, _text) ?? _text;
         return false;
     }
 }
@@ -333,13 +333,13 @@ internal static class InputUnderlineVoidPatches
     [HarmonyPrefix]
     static void Prefix(InputManager __instance, ref string _text)
     {
-        _text = InputDisplayTags.Replace(__instance, _text);
+        _text = InputDisplayTags.Replace(__instance, _text) ?? _text;
     }
 }
 
 internal static class InputDisplayTags
 {
-    internal static MethodInfo ReplaceTagsMethod() =>
+    internal static MethodInfo? ReplaceTagsMethod() =>
         typeof(InputManager).GetMethod(nameof(InputManager.InputDisplayReplaceTags),
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public |
             System.Reflection.BindingFlags.NonPublic, null,
@@ -357,7 +357,7 @@ internal static class InputDisplayTags
         return method != null && method.ReturnType == typeof(void);
     }
 
-    internal static string Replace(string text, IReadOnlyDictionary<string, string> tags)
+    internal static string? Replace(string? text, IReadOnlyDictionary<string, string>? tags)
     {
         if (text == null || tags == null)
             return text;
@@ -368,7 +368,7 @@ internal static class InputDisplayTags
         return text;
     }
 
-    internal static string Replace(InputManager manager, string text)
+    internal static string? Replace(InputManager? manager, string? text)
     {
         if (manager?.tagDictionary == null)
             return text;

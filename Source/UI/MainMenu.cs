@@ -6,6 +6,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
+using Unity.XR.CoreUtils;
 using UnityEngine.XR.Interaction.Toolkit.UI;
 
 namespace RepoXR.UI;
@@ -57,9 +58,18 @@ public class MainMenu : MonoBehaviour
     
     private static void DisableEventSystem()
     {
-        var input = GameObject.Find("EventSystem")?.GetComponent<InputSystemUIInputModule>();
+        var eventSystem = GameObject.Find("EventSystem");
+        if (eventSystem == null)
+            return;
+
+        var input = eventSystem.GetComponent<InputSystemUIInputModule>();
         if (input != null)
             input.enabled = false;
+
+        var xrUi = eventSystem.GetComponent<XRUIInputModule>();
+        if (xrUi == null)
+            xrUi = eventSystem.AddComponent<XRUIInputModule>();
+        xrUi.enabled = true;
     }
     
     private void SetupMainCamera()
@@ -108,10 +118,16 @@ public class MainMenu : MonoBehaviour
         if (mainCamera == null || mainCamera.transform.parent == null)
             throw new InvalidOperationException("the VR camera rig is not ready");
 
-        if (mainCamera.transform.parent.GetComponent<XRRayInteractorManager>() != null)
+        var rig = mainCamera.transform.parent.gameObject;
+        var origin = rig.GetComponent<XROrigin>();
+        if (origin == null)
+            origin = rig.AddComponent<XROrigin>();
+        origin.Camera = mainCamera;
+
+        if (rig.GetComponent<XRRayInteractorManager>() != null)
             return;
 
-        mainCamera.transform.parent.gameObject.AddComponent<XRRayInteractorManager>();
+        rig.AddComponent<XRRayInteractorManager>();
     }
 
     private static IEnumerator LobbyLinkCopy()

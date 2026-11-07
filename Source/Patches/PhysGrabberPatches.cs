@@ -27,9 +27,7 @@ internal static class PhysGrabberPatches
     {
         return GameSignatures.EditOrOriginal(instructions, "PhysGrabber hand aim", matcher =>
         {
-            matcher.MatchForward(false,
-                new CodeMatch(OpCodes.Callvirt,
-                    Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform))));
+            matcher.MatchForward(false, new CodeMatch(IsOverrideTransformCall));
             if (matcher.IsInvalid)
                 throw new InvalidOperationException("GetOverrideTransform was not called");
 
@@ -98,13 +96,22 @@ internal static class PhysGrabberPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> RayCheckPatches(IEnumerable<CodeInstruction> instructions)
     {
-        return new CodeMatcher(instructions)
-            // Replace grabber checks from camera with checks from hand
-            .MatchForward(false,
-                new CodeMatch(OpCodes.Callvirt,
-                    Method(typeof(PlayerLocalCamera), nameof(PlayerLocalCamera.GetOverrideTransform))))
-            .Set(OpCodes.Call, PlayerLocalCameraExtensions.GetHandOverrideTransformMethod)
-            .InstructionEnumeration();
+        return GameSignatures.EditOrOriginal(instructions, "PhysGrabber grab ray", matcher =>
+        {
+            matcher.MatchForward(false, new CodeMatch(IsOverrideTransformCall));
+            if (matcher.IsInvalid)
+                throw new InvalidOperationException("GetOverrideTransform was not called");
+
+            return matcher.Set(OpCodes.Call, PlayerLocalCameraExtensions.GetHandOverrideTransformMethod);
+        });
+    }
+
+    static bool IsOverrideTransformCall(CodeInstruction instruction)
+    {
+        return (instruction.opcode == OpCodes.Call || instruction.opcode == OpCodes.Callvirt)
+               && instruction.operand is MethodInfo method
+               && method.DeclaringType == typeof(PlayerLocalCamera)
+               && method.Name == nameof(PlayerLocalCamera.GetOverrideTransform);
     }
 
     /// <summary>

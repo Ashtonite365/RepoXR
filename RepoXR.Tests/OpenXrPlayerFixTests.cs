@@ -1,3 +1,4 @@
+using System;
 using System.Reflection;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
@@ -37,7 +38,8 @@ public class OpenXrPlayerFixTests
             var only = Assert.Single(send.Body.Instructions);
             Assert.Equal(OpCodes.Ret, only.OpCode);
 
-            var context = new System.Runtime.Loader.AssemblyLoadContext("repoxr-oxr-" + Guid.NewGuid().ToString("N"));
+            var context = new System.Runtime.Loader.AssemblyLoadContext(
+                "repoxr-oxr-" + Guid.NewGuid().ToString("N"), isCollectible: true);
             context.Resolving += (_, name) =>
             {
                 var candidate = Path.Combine(dir, name.Name + ".dll");
@@ -53,16 +55,21 @@ public class OpenXrPlayerFixTests
             sendMethod.Invoke(null, new object?[] { true });
             var instance = Activator.CreateInstance(loader);
             Assert.True((bool)initialize.Invoke(instance, null)!);
+            context.Unload();
         }
         finally
         {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
             try
             {
                 Directory.Delete(dir, recursive: true);
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                // The load context may still have the files mapped.
+                // A collectible load context can keep the temp DLL mapped until the
+                // finalizer runs. The production patcher reads the assembly in memory
+                // and does not load it into an AssemblyLoadContext.
             }
         }
     }

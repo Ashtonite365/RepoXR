@@ -238,8 +238,23 @@ internal static class CameraAimPatches
     [HarmonyPostfix]
     private static void OnCameraAimSpawn(ref Quaternion _rotation, bool _setRotation)
     {
-        if (_setRotation)
+        if (!_setRotation)
+            return;
+
+        if (VRCameraAim.instance == null)
+            AttachExisting();
+
+        if (VRCameraAim.instance != null)
             VRCameraAim.instance.SetPlayerAim(_rotation.eulerAngles.y);
+    }
+
+    internal static void AttachExisting()
+    {
+        foreach (var aim in Object.FindObjectsOfType<CameraAim>())
+        {
+            if (aim.GetComponent<VRCameraAim>() == null)
+                aim.gameObject.AddComponent<VRCameraAim>();
+        }
     }
     
     /// <summary>

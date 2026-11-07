@@ -30,6 +30,7 @@ Here is a list of RepoXR versions and which version(s) of R.E.P.O. it supports
 
 | RepoXR FBT | R.E.P.O. Version |
 |------------|------------------|
+| v1.3.10 (menu ray origin and catalog bundle reuse) | v0.5.1 |
 | v1.3.9 (menu controller pointer and 0.5.1 patch repairs) | v0.5.1 |
 | v1.3.8 (log the OpenXR launch check; follow Steam's in-VR flag) | v0.5.1 |
 | v1.3.7 (skip OpenXR when no runtime is connected) | v0.5.1 |

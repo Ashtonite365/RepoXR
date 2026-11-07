@@ -2,6 +2,7 @@
 using RepoXR.Assets;
 using RepoXR.Input;
 using UnityEngine;
+using UnityEngine.InputSystem.XR;
 using UnityEngine.InputSystem;
 using UnityEngine.XR.Interaction.Toolkit;
 
@@ -51,6 +52,36 @@ public class XRRayInteractorManager : MonoBehaviour
             leftActions.uiPressAction.action.performed -= LeftControllerPressed;
         if (rightActions != null && rightActions.uiPressAction.action != null)
             rightActions.uiPressAction.action.performed -= RightControllerPressed;
+    }
+
+    void LateUpdate()
+    {
+        var tracking = TrackingInput.Instance;
+        if (tracking == null)
+            return;
+
+        var rig = transform;
+        PoseFromTracking(leftInteractor, tracking.LeftHandTransform, rig);
+        PoseFromTracking(rightInteractor, tracking.RightHandTransform, rig);
+    }
+
+    static void PoseFromTracking(XRRayInteractor interactor, Transform tracked, Transform rig)
+    {
+        if (interactor == null || tracked == null || rig == null)
+            return;
+
+        if (tracked.localPosition.sqrMagnitude < 0.0001f && tracked.localRotation == Quaternion.identity)
+        {
+            var camera = rig.GetComponent<Unity.XR.CoreUtils.XROrigin>()?.Camera;
+            if (camera != null)
+                interactor.transform.SetPositionAndRotation(camera.transform.position,
+                    camera.transform.rotation * Quaternion.Euler(15f, 0f, 0f));
+            return;
+        }
+
+        interactor.transform.SetPositionAndRotation(
+            rig.TransformPoint(tracked.localPosition),
+            rig.rotation * tracked.localRotation);
     }
 
     public void SetVisible(bool visible)
@@ -155,8 +186,8 @@ public class XRRayInteractorManager : MonoBehaviour
             mode = GradientMode.Blend,
             alphaKeys =
             [
-                new GradientAlphaKey(0.2f, 0),
-                new GradientAlphaKey(0.2f, 1),
+                new GradientAlphaKey(0.9f, 0),
+                new GradientAlphaKey(0.9f, 1),
             ],
             colorKeys =
             [
@@ -164,7 +195,7 @@ public class XRRayInteractorManager : MonoBehaviour
                 new GradientColorKey(Color.white, 1)
             ]
         };
-        
+
         newVisual.validColorGradient = new Gradient
         {
             mode = GradientMode.Blend,

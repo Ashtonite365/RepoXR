@@ -1,3 +1,11 @@
+# 1.3.10 (RepoXR FBT fork)
+
+**Fixes**:
+- The 1.3.9 menu created the controller pointer and then the line visual logged `XROrigin is not found` twice, once per hand. The menu rig now has an `XROrigin` and an `XRUIInputModule` before the rays are created. Each hand is posed from the tracked pointer, and the beam stays bright when it is not touching a button. The game's own menu cursor is no longer turned off, so a mouse still has its cursor.
+- `CameraAim.SetPlayerAim` no longer throws when `VRCameraAim` was not attached yet. Existing aim objects are picked up when VR starts after the scene.
+- PhysGrabber hand aim matches both `call` and `callvirt` to `GetOverrideTransform`. The 1.3.9 log only matched `callvirt`, so the Update grab ray was left unchanged.
+- Localization bundles are opened once and reused. A failed catalog no longer calls Addressables again for the same seven tutorial keys, which was logging `InvalidKeyException` and "bundle already loaded" for every key.
+
 # 1.3.9 (RepoXR FBT fork)
 
 **Fixes**:

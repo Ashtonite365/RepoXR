@@ -41,7 +41,7 @@ internal static class MenuPageSavesPatches
             yield return leave;
     }
 
-    internal static Type GameType(string name)
+    internal static Type? GameType(string name)
     {
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
         {
@@ -62,7 +62,7 @@ internal static class MenuPageSavesPatches
         return null;
     }
 
-    static MethodInfo Method(Type type, string name) =>
+    static MethodInfo? Method(Type? type, string name) =>
         type?.GetMethod(name,
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
 

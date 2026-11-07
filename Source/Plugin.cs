@@ -8,6 +8,7 @@ using BepInEx;
 using JetBrains.Annotations;
 using RepoXR.Assets;
 using RepoXR.Patches;
+using RepoXR.Player.Camera;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -22,7 +23,7 @@ public class Plugin : BaseUnityPlugin
     // Distinct from official io.daxcess.repoxr so this fork is not the Thunderstore package identity.
     public const string PLUGIN_GUID = "io.ashtonite.repoxr.fbt";
     public const string PLUGIN_NAME = "RepoXR FBT";
-    public const string PLUGIN_VERSION = "1.3.9";
+    public const string PLUGIN_VERSION = "1.3.10";
 
     public const string SUPPORTED_GAME_VERSION = "v0.5.1";
 
@@ -153,6 +154,7 @@ public class Plugin : BaseUnityPlugin
         if (OpenXrRuntimeConnected() && InitializeVR(pendingRuntime))
         {
             Flags |= Flags.VR;
+            CameraAimPatches.AttachExisting();
             if (GameObject.Find("UI/HUD/HUD Canvas") != null)
                 Entrypoint.SetupDefaultSceneVR();
         }

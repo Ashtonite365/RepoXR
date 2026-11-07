@@ -24,8 +24,8 @@ public class MenuPointerRepairTests
     [Fact]
     public void Mouse_axis_reads_are_replaced_without_deleting_a_fixed_window()
     {
-        var stickX = typeof(MenuPointerRepairTests).GetMethod(nameof(Axis));
-        var stickY = typeof(MenuPointerRepairTests).GetMethod(nameof(Axis));
+        var stickX = typeof(MenuPointerRepairTests).GetMethod(nameof(Axis))!;
+        var stickY = typeof(MenuPointerRepairTests).GetMethod(nameof(Axis))!;
         var call = typeof(MenuPointerRepairTests).GetMethod(nameof(ReadAxis));
         var instructions = new List<CodeInstruction>
         {
@@ -52,8 +52,8 @@ public class MenuPointerRepairTests
     {
         var instructions = new List<CodeInstruction> { new(OpCodes.Ldstr, "Mouse X"), new(OpCodes.Ret) };
 
-        var replaced = MouseAxisRewrite.Replace(instructions, typeof(MenuPointerRepairTests).GetMethod(nameof(Axis)),
-            typeof(MenuPointerRepairTests).GetMethod(nameof(Axis)));
+        var axis = typeof(MenuPointerRepairTests).GetMethod(nameof(Axis))!;
+        var replaced = MouseAxisRewrite.Replace(instructions, axis, axis);
 
         Assert.Equal(0, replaced);
         Assert.Equal(OpCodes.Ldstr, instructions[0].opcode);
