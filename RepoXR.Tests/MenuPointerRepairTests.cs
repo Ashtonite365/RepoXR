@@ -152,14 +152,41 @@ public class MenuPointerRepairTests
     }
 
     [Fact]
-    public void The_sketch_moves_the_menu_in_front_of_the_truck()
+    public void The_menu_faces_the_start_camera_and_stays_there()
     {
-        var pose = RepoXR.UI.MenuTarget.MenuPose(0f, 1f, 0f, 0f, 1f, 1f, 0f);
-        Assert.Equal(0.6f, pose.x, 3);
-        Assert.Equal(1.4f, pose.y, 3);
-        Assert.Equal(1.2f, pose.z, 3);
-        Assert.True(pose.faceX < -0.9f);
-        Assert.True(pose.faceZ > 0.3f);
+        var start = RepoXR.UI.MenuTarget.MenuPose(0f, 1f, 4f, 0f, 1f, -2f, -3f);
+        Assert.Equal(0f, start.x, 3);
+        Assert.Equal(2.8f, start.y, 3);
+        Assert.Equal(7f, start.z, 3);
+        var toStartX = -2f - start.x;
+        var toStartZ = -3f - start.z;
+        var startLen = MathF.Sqrt(toStartX * toStartX + toStartZ * toStartZ);
+        var towardStart = (start.faceX * toStartX + start.faceZ * toStartZ) / startLen;
+        Assert.Equal(1f, towardStart, 3);
+
+        var later = RepoXR.UI.MenuTarget.MenuPose(0f, 1f, 4f, 0f, 1f, 9f, 2f);
+        var toLaterX = 9f - start.x;
+        var toLaterZ = 2f - start.z;
+        var laterLen = MathF.Sqrt(toLaterX * toLaterX + toLaterZ * toLaterZ);
+        var storedTowardLater = (start.faceX * toLaterX + start.faceZ * toLaterZ) / laterLen;
+        Assert.True(storedTowardLater < 0.5f);
+        Assert.NotEqual(start.faceX, later.faceX);
+    }
+
+    [Fact]
+    public void The_plane_is_five_times_larger_and_the_ray_rect_is_unchanged()
+    {
+        var size = RepoXR.UI.MenuTarget.PhysicalSize(1.6f, 0.9f, RepoXR.UI.MenuTarget.MenuScale);
+        Assert.Equal(8f, size.width, 3);
+        Assert.Equal(4.5f, size.height, 3);
+        Assert.Equal(1.6f / 0.9f, size.width / size.height, 3);
+        var uniform = 0.001f * RepoXR.UI.MenuTarget.MenuScale;
+        var edge = RepoXR.UI.MenuTarget.LocalOnScaledPlane(size.width * 0.5f, 0f, uniform);
+        Assert.Equal(800f, edge.x, 2);
+        var uv = RepoXR.UI.MenuTarget.UvFromLocal(edge.x, edge.y, 1600f, 900f);
+        Assert.Equal(1f, uv.u, 3);
+        Assert.Equal(0.5f, uv.v, 3);
+        Assert.True(RepoXR.UI.MenuRay.MaxDistance > RepoXR.UI.MenuTarget.MenuForwardMeters + size.width);
     }
 
     public static float Axis() => 1f;

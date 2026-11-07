@@ -1,3 +1,8 @@
+# 1.3.22 (RepoFBT)
+
+**Fixes**:
+- 1.3.21 was visible and only slightly offset. The same HUD capture and `frontPanelTransform` anchor stay. The plane is now 3 m in front of that panel (was 1.2 m, and the 0.6 m right shift is gone), 1.8 m above it (was 0.4 m), and five times the size: 8 m by 4.5 m. The visible face points at the camera position taken when the menu appears. The plane is unparented and not moved again. Local rect stays 1600 by 900 so a ray hit still maps to the same canvas point.
+
 # 1.3.21 (RepoFBT)
 
 **Fixes**:

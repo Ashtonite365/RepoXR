@@ -104,15 +104,16 @@ internal static class MenuPlacement
         var display = displayObject.GetComponent<RectTransform>();
         display.anchorMin = display.anchorMax = display.pivot = new Vector2(0.5f, 0.5f);
         display.sizeDelta = new Vector2(WidthMeters * 1000f, HeightMeters * 1000f);
-        displayObject.transform.localScale = Vector3.one * 0.001f;
+        displayObject.transform.localScale = Vector3.one * (0.001f * MenuTarget.MenuScale);
         var image = displayObject.AddComponent<RawImage>();
         image.texture = texture;
         image.raycastTarget = false;
 
-        // 1.3.17 puts the plane 1.4 m along the camera, then leaves it in the world.
-        // The sketch moves that same plane: in front of the menu truck's front panel,
-        // slightly to the truck's right, turned 21.6°, and raised 0.4 m. One sample.
-        var position = camera.transform.position + camera.transform.forward * DistanceMeters;
+        // 1.3.17 capture is unchanged. The plane is placed once from the front panel:
+        // 3 m in front of the nose, 1.8 m above that panel, facing the camera position
+        // sampled here. It is not parented to the camera and this method does not run again.
+        var cameraStart = camera.transform.position;
+        var position = cameraStart + camera.transform.forward * DistanceMeters;
         var rotation = camera.transform.rotation;
         var poseDetail = "moved=False";
         var animated = UnityEngine.Object.FindObjectOfType<TruckMenuAnimated>();
@@ -130,17 +131,22 @@ internal static class MenuPlacement
             if (fwd.sqrMagnitude > 0.0001f)
             {
                 fwd.Normalize();
-                var right = Vector3.Cross(Vector3.up, fwd);
                 var pose = MenuTarget.MenuPose(panel.position.x, panel.position.y, panel.position.z, fwd.x, fwd.z,
-                    right.x, right.z);
+                    cameraStart.x, cameraStart.z);
                 position = new Vector3(pose.x, pose.y, pose.z);
                 var face = new Vector3(pose.faceX, 0f, pose.faceZ);
                 rotation = Quaternion.LookRotation(-face.normalized, Vector3.up);
+                var sized = MenuTarget.PhysicalSize(WidthMeters, HeightMeters, MenuTarget.MenuScale);
                 poseDetail = "moved=True anchor='frontPanel' panelPos=" + Format(panel.position) +
                              " rootPos=" + Format(animated.transform.position) +
                              " truckFwd=" + Format(fwd) +
                              " face=" + Format(face.normalized) +
-                             " raise=" + MenuTarget.MenuRaiseMeters.ToString("0.###", CultureInfo.InvariantCulture);
+                             " cameraStart=" + Format(cameraStart) +
+                             " forward=" + MenuTarget.MenuForwardMeters.ToString("0.###", CultureInfo.InvariantCulture) +
+                             " raise=" + MenuTarget.MenuRaiseMeters.ToString("0.###", CultureInfo.InvariantCulture) +
+                             " scale=" + MenuTarget.MenuScale.ToString("0.###", CultureInfo.InvariantCulture) +
+                             " planeSize=(" + sized.width.ToString("0.###", CultureInfo.InvariantCulture) + "," +
+                             sized.height.ToString("0.###", CultureInfo.InvariantCulture) + ")";
             }
         }
 

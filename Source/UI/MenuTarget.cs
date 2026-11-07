@@ -73,24 +73,37 @@ internal static class MenuTarget
     }
 
     /// <summary>
-    /// Placement-only offset from the right-hand sketch. The truck arrow points forward.
-    /// The menu is 1.2 m in front of the truck point and 0.6 m to the truck's right.
-    /// Its visible face points toward the truck's left, 21.6° toward forward.
-    /// Height is the truck point plus a 0.4 m raise. No bounds or view test.
+    /// 1.3.21 sat 1.2 m forward and 0.6 m to the right of the front panel, 0.4 m up.
+    /// That read as a small nudge. This centers the plane on the nose, 3 m in front,
+    /// and 1.8 m above the panel. The visible face points at the camera position
+    /// passed in, which the caller samples once.
     /// </summary>
-    internal const float MenuForwardMeters = 1.2f;
-    internal const float MenuRightMeters = 0.6f;
-    internal const float MenuRaiseMeters = 0.4f;
-    internal const float MenuYawDegrees = 21.6f;
+    internal const float MenuForwardMeters = 3f;
+    internal const float MenuRaiseMeters = 1.8f;
+    internal const float MenuScale = 5f;
 
     internal static (float x, float y, float z, float faceX, float faceZ) MenuPose(
-        float truckX, float truckY, float truckZ, float forwardX, float forwardZ, float rightX, float rightZ)
+        float truckX, float truckY, float truckZ, float forwardX, float forwardZ, float cameraX, float cameraZ)
     {
-        var x = truckX + forwardX * MenuForwardMeters + rightX * MenuRightMeters;
-        var z = truckZ + forwardZ * MenuForwardMeters + rightZ * MenuRightMeters;
-        var yaw = MenuYawDegrees * MathF.PI / 180f;
-        var faceX = -rightX * MathF.Cos(yaw) + forwardX * MathF.Sin(yaw);
-        var faceZ = -rightZ * MathF.Cos(yaw) + forwardZ * MathF.Sin(yaw);
-        return (x, truckY + MenuRaiseMeters, z, faceX, faceZ);
+        var x = truckX + forwardX * MenuForwardMeters;
+        var z = truckZ + forwardZ * MenuForwardMeters;
+        var y = truckY + MenuRaiseMeters;
+        var dx = cameraX - x;
+        var dz = cameraZ - z;
+        var mag = MathF.Sqrt(dx * dx + dz * dz);
+        if (mag < 0.01f)
+            return (x, y, z, -forwardX, -forwardZ);
+
+        return (x, y, z, dx / mag, dz / mag);
     }
+
+    internal static (float width, float height) PhysicalSize(float widthMeters, float heightMeters, float menuScale) =>
+        (widthMeters * menuScale, heightMeters * menuScale);
+
+    /// <summary>
+    /// Ray hits use the plane's local rect. Uniform scale changes world size only,
+    /// so a point on the physical edge still lands on the same local edge.
+    /// </summary>
+    internal static (float x, float y) LocalOnScaledPlane(float worldX, float worldY, float uniformScale) =>
+        (worldX / uniformScale, worldY / uniformScale);
 }
