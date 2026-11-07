@@ -140,6 +140,15 @@ public class MenuPointerRepairTests
         Assert.False(RepoXR.UI.MenuTarget.RayPlane(0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1.4f, 0f, 0f, 1f, 30f, out _));
         Assert.False(RepoXR.UI.MenuTarget.CoversDesktopMirror(isPresentedMenu: true, screenOverlay: true));
         Assert.True(RepoXR.UI.MenuTarget.CoversDesktopMirror(isPresentedMenu: false, screenOverlay: true));
+        var uv = RepoXR.UI.MenuTarget.UvFromLocal(0f, 0f, 1.6f, 0.9f);
+        Assert.Equal(0.5f, uv.u, 3);
+        Assert.Equal(0.5f, uv.v, 3);
+        var local = RepoXR.UI.MenuTarget.LocalFromUv(0f, 0f, 0f, 0f, 712f, 400f);
+        Assert.Equal(0f, local.x, 3);
+        Assert.Equal(0f, local.y, 3);
+        var mid = RepoXR.UI.MenuTarget.LocalFromUv(0.5f, 0.5f, 0f, 0f, 712f, 400f);
+        Assert.Equal(356f, mid.x, 3);
+        Assert.Equal(200f, mid.y, 3);
     }
 
     public static float Axis() => 1f;

@@ -42,11 +42,15 @@ internal static class UIPatches
     private static void FollowControllerAim(MenuCursor __instance)
     {
         var manager = XRRayInteractorManager.Instance;
-        if (manager == null || !manager.TryAimPoint(out var world))
+        if (manager == null)
             return;
 
-        var canvas = MenuPlacement.Current != null ? MenuPlacement.Current : HUDCanvas.instance.GetComponent<RectTransform>();
-        __instance.transform.SetPositionAndRotation(world, canvas.rotation);
+        var canvas = MenuPlacement.Current;
+        if (canvas == null || !manager.TryMenuLocal(out var local))
+            return;
+
+        __instance.transform.position = canvas.TransformPoint(new Vector3(local.x, local.y, 0f));
+        __instance.transform.rotation = canvas.rotation;
         __instance.showTimer = 0.2f;
         if (__instance.mesh != null)
             __instance.mesh.SetActive(true);

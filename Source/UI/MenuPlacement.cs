@@ -1,7 +1,7 @@
 using System.Globalization;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.XR.Interaction.Toolkit.UI;
+using UnityEngine.XR;
 
 namespace RepoXR.UI;
 
@@ -19,6 +19,7 @@ internal static class MenuPlacement
     static bool loggedWaiting;
 
     internal static RectTransform Current { get; private set; }
+    internal static RectTransform Display { get; private set; }
 
     internal static void Present(MenuPageMain page)
     {
@@ -44,9 +45,13 @@ internal static class MenuPlacement
         }
 
         var rect = canvas.GetComponent<RectTransform>();
-        // 1.3.15: pivot (0,0) and anchors (0,0)-(1,1). Detaching that stretch rect
-        // collapses it, so the buttons vanish while a stored point still projects to centre.
-        var size = FreezeSize(rect);
+        var size = rect.rect.size;
+        if (size.x < 1f || size.y < 1f)
+            size = rect.sizeDelta;
+        if (size.x < 1f)
+            size.x = 712f;
+        if (size.y < 1f)
+            size.y = 400f;
 
         canvas.gameObject.SetActive(true);
         canvas.enabled = true;
@@ -60,67 +65,98 @@ internal static class MenuPlacement
             return;
         }
 
-        var scale = MenuTarget.ScaleToFit(size.x, size.y, WidthMeters, HeightMeters);
-        var local = MenuTarget.LocalPositionForContent(0f, 0f, scale, DistanceMeters);
-        canvas.renderMode = RenderMode.WorldSpace;
-        canvas.worldCamera = camera;
-        canvas.transform.SetParent(camera.transform, false);
-        canvas.transform.localRotation = Quaternion.identity;
-        canvas.transform.localScale = new Vector3(scale, scale, scale);
-        canvas.transform.localPosition = new Vector3(local.x, local.y, local.z);
-        var heldRotation = canvas.transform.rotation;
-        var heldPosition = canvas.transform.position;
-        canvas.transform.SetParent(null, true);
-        canvas.transform.SetPositionAndRotation(heldPosition, heldRotation);
+        // Leave the game's anchors, pivot, and children alone. Draw that canvas into a
+        // texture, then show the texture on a fixed plane. 1.3.16 rewrote the stretch
+        // rect and the buttons stopped drawing even though a point still projected to centre.
+        var capture = new GameObject("RepoFBT Menu Capture");
+        var uiCamera = capture.AddComponent<Camera>();
+        uiCamera.enabled = true;
+        uiCamera.clearFlags = CameraClearFlags.SolidColor;
+        uiCamera.backgroundColor = new Color(0f, 0f, 0f, 0f);
+        uiCamera.orthographic = true;
+        uiCamera.orthographicSize = 1f;
+        uiCamera.nearClipPlane = 0.01f;
+        uiCamera.farClipPlane = 5f;
+        uiCamera.transform.position = new Vector3(0f, -4000f, 0f);
+        uiCamera.cullingMask = 1 << canvas.gameObject.layer;
+        uiCamera.stereoTargetEye = StereoTargetEyeMask.None;
+        uiCamera.depth = -50;
+        uiCamera.allowHDR = false;
+        uiCamera.allowMSAA = false;
 
-        var raycaster = canvas.GetComponent<GraphicRaycaster>();
-        if (raycaster != null)
-            raycaster.enabled = false;
-        if (canvas.GetComponent<TrackedDeviceGraphicRaycaster>() == null)
-            canvas.gameObject.AddComponent<TrackedDeviceGraphicRaycaster>();
+        var texture = new RenderTexture(Mathf.Max(2, Mathf.RoundToInt(size.x)),
+            Mathf.Max(2, Mathf.RoundToInt(size.y)), 0, RenderTextureFormat.ARGB32)
+        {
+            name = "RepoFBT Menu"
+        };
+        texture.Create();
+        uiCamera.targetTexture = texture;
+        uiCamera.aspect = size.x / size.y;
+
+        canvas.renderMode = RenderMode.ScreenSpaceCamera;
+        canvas.worldCamera = uiCamera;
+        canvas.planeDistance = 1f;
+
+        var displayObject = new GameObject("RepoFBT Menu Plane");
+        var displayCanvas = displayObject.AddComponent<Canvas>();
+        displayCanvas.renderMode = RenderMode.WorldSpace;
+        displayObject.layer = 0;
+        var display = displayObject.GetComponent<RectTransform>();
+        display.anchorMin = display.anchorMax = display.pivot = new Vector2(0.5f, 0.5f);
+        display.sizeDelta = new Vector2(WidthMeters * 1000f, HeightMeters * 1000f);
+        displayObject.transform.localScale = Vector3.one * 0.001f;
+        var image = displayObject.AddComponent<RawImage>();
+        image.texture = texture;
+        image.raycastTarget = false;
+
+        display.SetPositionAndRotation(
+            camera.transform.position + camera.transform.forward * DistanceMeters,
+            camera.transform.rotation);
+        display.SetParent(null, true);
 
         Current = rect;
+        Display = display;
         presentedId = page.GetInstanceID();
 
-        var contentWorld = canvas.transform.position;
-        var center = camera.WorldToViewportPoint(contentWorld);
-        var inView = MenuView.CenterInView(center.x, center.y, center.z);
+        var view = camera.WorldToViewportPoint(display.position);
+        var inView = MenuView.CenterInView(view.x, view.y, view.z);
         var pageRect = page.GetComponent<RectTransform>();
         Logger.LogInfo(
             "Menu page canvas '" + canvas.name +
             "' hud=" + MenuTarget.IsHudCanvas(canvas.name) +
-            " active=" + canvas.gameObject.activeInHierarchy +
-            " enabled=" + canvas.enabled +
-            " mode=" + canvas.renderMode +
-            " pos=" + Format(canvas.transform.position) +
-            " scale=" + Format(canvas.transform.lossyScale) +
-            " pivot=" + (pageRect != null ? Format(pageRect.pivot) : "(none)") +
-            " anchorMin=" + (pageRect != null ? Format(pageRect.anchorMin) : "(none)") +
-            " anchorMax=" + (pageRect != null ? Format(pageRect.anchorMax) : "(none)") +
-            " frozenSize=" + Format(size) +
-            " contentCenter=" + Format(Vector3.zero) +
-            " localOffset=" + Format(new Vector3(local.x, local.y, local.z)) +
+            " leftInPlace=True mode=" + canvas.renderMode +
+            " sourceSize=" + Format(size) +
             " page='" + page.name + "' active=" + page.gameObject.activeInHierarchy +
-            " contentViewport=" + Format(center) +
-            " contentInView=" + inView +
+            " pagePivot=" + (pageRect != null ? Format(pageRect.pivot) : "(none)") +
+            " pageAnchorMin=" + (pageRect != null ? Format(pageRect.anchorMin) : "(none)") +
+            " pageAnchorMax=" + (pageRect != null ? Format(pageRect.anchorMax) : "(none)") +
+            " planePos=" + Format(display.position) +
+            " planeViewport=" + Format(view) +
+            " planeInView=" + inView +
             " cameraPos=" + Format(camera.transform.position) +
             " cameraFwd=" + Format(camera.transform.forward));
         ReleaseDesktopMirror(canvas);
     }
 
-    static Vector2 FreezeSize(RectTransform rect)
+    internal static bool TryLocal(Transform ray, out Vector2 canvasLocal, out Vector3 world)
     {
-        var size = rect.rect.size;
-        if (size.x < 1f || size.y < 1f)
-            size = rect.sizeDelta;
+        canvasLocal = default;
+        world = default;
+        if (ray == null || Display == null || Current == null)
+            return false;
+        if (!XRRayInteractorManager.MenuPlaneHit(ray, Display, out world, out var planeLocal))
+            return false;
 
-        var worldCenter = rect.TransformPoint(rect.rect.center);
-        rect.anchorMin = new Vector2(0.5f, 0.5f);
-        rect.anchorMax = new Vector2(0.5f, 0.5f);
-        rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.sizeDelta = size;
-        rect.position = worldCenter;
-        return size;
+        var plane = Display.rect;
+        var source = Current.rect;
+        if (plane.width < 0.001f || plane.height < 0.001f)
+            return false;
+
+        var u = (planeLocal.x - plane.xMin) / plane.width;
+        var v = (planeLocal.y - plane.yMin) / plane.height;
+        var mapped = MenuTarget.LocalFromUv(u, v, source.xMin, source.yMin, source.xMax, source.yMax);
+        canvasLocal = new Vector2(mapped.x, mapped.y);
+        return u >= 0f && u <= 1f && v >= 0f && v <= 1f;
     }
 
     static void ReleaseDesktopMirror(Canvas menuCanvas)

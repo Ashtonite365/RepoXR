@@ -1,3 +1,8 @@
+# 1.3.17 (RepoFBT)
+
+**Fixes**:
+- 1.3.16 logged `pivot=(0,0)`, stretched anchors, `contentCenter=(0,0,0)`, `localOffset=(0,0,1.4)`, and `contentViewport=(0.5,0.5,1.4)`, then the cursor did meet the ray. `contentCenter` in that line was the canvas pivot after it was forced to the centre, not a measured button. The page stayed stretched from the bottom-left, and rewriting that rect is what stopped the game's UI from drawing. The HUD canvas is no longer reparented or resized. It is drawn, as the game laid it out, into a texture on a plane fixed 1.4 m in front of the camera. The controller ray on that plane is converted to the canvas coordinates the game's hover already uses. The Windows product name is RepoFBT. The file is still `RepoXR.dll` and the id is still `io.ashtonite.repoxr.fbt`.
+
 # 1.3.16 (RepoFBT)
 
 **Fixes**:

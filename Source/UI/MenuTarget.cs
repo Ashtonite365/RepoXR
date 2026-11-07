@@ -60,4 +60,15 @@ internal static class MenuTarget
 
     internal static bool CoversDesktopMirror(bool isPresentedMenu, bool screenOverlay) =>
         !isPresentedMenu && screenOverlay;
+
+    internal static (float x, float y) LocalFromUv(float u, float v, float xMin, float yMin, float xMax, float yMax) =>
+        (xMin + (xMax - xMin) * u, yMin + (yMax - yMin) * v);
+
+    internal static (float u, float v) UvFromLocal(float localX, float localY, float width, float height)
+    {
+        if (width < 0.001f || height < 0.001f)
+            return (0.5f, 0.5f);
+
+        return (localX / width + 0.5f, localY / height + 0.5f);
+    }
 }

@@ -122,6 +122,16 @@ public class XRRayInteractorManager : MonoBehaviour
     /// World point where the active controller ray meets a world-space menu canvas.
     /// The game menu cursor uses this. The laser line is left where it is.
     /// </summary>
+    public bool TryMenuLocal(out Vector2 local)
+    {
+        local = default;
+        var (interactor, _) = GetActiveInteractor();
+        if (interactor == null)
+            return false;
+
+        return MenuPlacement.TryLocal(interactor.transform, out local, out _);
+    }
+
     public bool TryAimPoint(out Vector3 world)
     {
         world = default;
@@ -130,7 +140,7 @@ public class XRRayInteractorManager : MonoBehaviour
         if (interactor == null || canvas == null)
             return false;
 
-        return MenuPlaneHit(interactor.transform, canvas, out world, out _);
+        return MenuPlacement.TryLocal(interactor.transform, out _, out world);
     }
 
     internal static bool MenuPlaneHit(Transform ray, RectTransform canvas, out Vector3 world, out Vector2 local)
@@ -174,9 +184,7 @@ public class XRRayInteractorManager : MonoBehaviour
     public Vector2 GetUIHitPosition(RectTransform? rect)
     {
         var (interactor, _) = GetActiveInteractor();
-        var canvas = MenuPlacement.Current;
-        if (interactor != null && canvas != null &&
-            MenuPlaneHit(interactor.transform, canvas, out _, out var local))
+        if (interactor != null && MenuPlacement.TryLocal(interactor.transform, out var local, out _))
             return local;
 
         if (rect != null && TryHit(rect, out var world))
