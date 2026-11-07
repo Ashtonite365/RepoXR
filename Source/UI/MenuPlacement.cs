@@ -12,6 +12,7 @@ namespace RepoXR.UI;
 internal static class MenuPlacement
 {
     internal const float WidthMeters = 1.6f;
+    internal const float HeightMeters = 0.9f;
     internal const float DistanceMeters = 1.4f;
 
     static int presentedId;
@@ -43,9 +44,9 @@ internal static class MenuPlacement
         }
 
         var rect = canvas.GetComponent<RectTransform>();
-        var width = rect.rect.width;
-        if (width < 1f)
-            width = rect.sizeDelta.x;
+        // 1.3.15: pivot (0,0) and anchors (0,0)-(1,1). Detaching that stretch rect
+        // collapses it, so the buttons vanish while a stored point still projects to centre.
+        var size = FreezeSize(rect);
 
         canvas.gameObject.SetActive(true);
         canvas.enabled = true;
@@ -59,17 +60,14 @@ internal static class MenuPlacement
             return;
         }
 
-        var scale = MenuTarget.ScaleForWidth(width, WidthMeters);
-        var contentCenter = ContentCenter(rect, page.transform);
-        var local = MenuTarget.LocalPositionForContent(contentCenter.x, contentCenter.y, scale, DistanceMeters);
+        var scale = MenuTarget.ScaleToFit(size.x, size.y, WidthMeters, HeightMeters);
+        var local = MenuTarget.LocalPositionForContent(0f, 0f, scale, DistanceMeters);
         canvas.renderMode = RenderMode.WorldSpace;
         canvas.worldCamera = camera;
         canvas.transform.SetParent(camera.transform, false);
         canvas.transform.localRotation = Quaternion.identity;
         canvas.transform.localScale = new Vector3(scale, scale, scale);
         canvas.transform.localPosition = new Vector3(local.x, local.y, local.z);
-        // One placement in the world. The view rig (Tilt and the rest) keeps moving;
-        // leaving the canvas on that rig would drag the menu with the head.
         var heldRotation = canvas.transform.rotation;
         var heldPosition = canvas.transform.position;
         canvas.transform.SetParent(null, true);
@@ -84,7 +82,7 @@ internal static class MenuPlacement
         Current = rect;
         presentedId = page.GetInstanceID();
 
-        var contentWorld = canvas.transform.TransformPoint(contentCenter);
+        var contentWorld = canvas.transform.position;
         var center = camera.WorldToViewportPoint(contentWorld);
         var inView = MenuView.CenterInView(center.x, center.y, center.z);
         var pageRect = page.GetComponent<RectTransform>();
@@ -99,7 +97,8 @@ internal static class MenuPlacement
             " pivot=" + (pageRect != null ? Format(pageRect.pivot) : "(none)") +
             " anchorMin=" + (pageRect != null ? Format(pageRect.anchorMin) : "(none)") +
             " anchorMax=" + (pageRect != null ? Format(pageRect.anchorMax) : "(none)") +
-            " contentCenter=" + Format(contentCenter) +
+            " frozenSize=" + Format(size) +
+            " contentCenter=" + Format(Vector3.zero) +
             " localOffset=" + Format(new Vector3(local.x, local.y, local.z)) +
             " page='" + page.name + "' active=" + page.gameObject.activeInHierarchy +
             " contentViewport=" + Format(center) +
@@ -109,36 +108,19 @@ internal static class MenuPlacement
         ReleaseDesktopMirror(canvas);
     }
 
-    static Vector3 ContentCenter(RectTransform canvas, Transform page)
+    static Vector2 FreezeSize(RectTransform rect)
     {
-        var canvasSize = canvas.rect.size;
-        var any = false;
-        var total = new Bounds(Vector3.zero, Vector3.zero);
-        foreach (var child in page.GetComponentsInChildren<RectTransform>(true))
-        {
-            if (child == null || child == canvas)
-                continue;
-            if (child.gameObject == page.gameObject && page.childCount > 0)
-                continue;
+        var size = rect.rect.size;
+        if (size.x < 1f || size.y < 1f)
+            size = rect.sizeDelta;
 
-            var bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(canvas, child);
-            if (canvasSize.x > 1f && canvasSize.y > 1f &&
-                bounds.size.x > canvasSize.x * 0.85f && bounds.size.y > canvasSize.y * 0.85f)
-                continue;
-
-            if (!any)
-            {
-                total = bounds;
-                any = true;
-            }
-            else
-                total.Encapsulate(bounds);
-        }
-
-        if (!any)
-            total = RectTransformUtility.CalculateRelativeRectTransformBounds(canvas, page);
-
-        return total.center;
+        var worldCenter = rect.TransformPoint(rect.rect.center);
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = size;
+        rect.position = worldCenter;
+        return size;
     }
 
     static void ReleaseDesktopMirror(Canvas menuCanvas)

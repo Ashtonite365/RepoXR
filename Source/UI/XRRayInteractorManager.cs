@@ -130,7 +130,31 @@ public class XRRayInteractorManager : MonoBehaviour
         if (interactor == null || canvas == null)
             return false;
 
-        return MenuRay.Hits(interactor.transform, canvas, out world);
+        return MenuPlaneHit(interactor.transform, canvas, out world, out _);
+    }
+
+    internal static bool MenuPlaneHit(Transform ray, RectTransform canvas, out Vector3 world, out Vector2 local)
+    {
+        world = default;
+        local = default;
+        if (ray == null || canvas == null)
+            return false;
+
+        var origin = ray.position;
+        var direction = ray.forward;
+        var point = canvas.position;
+        var normal = canvas.forward;
+        var hit = MenuTarget.RayPlane(origin.x, origin.y, origin.z, direction.x, direction.y, direction.z,
+                      point.x, point.y, point.z, -normal.x, -normal.y, -normal.z, MenuRay.MaxDistance, out var distance)
+                  || MenuTarget.RayPlane(origin.x, origin.y, origin.z, direction.x, direction.y, direction.z,
+                      point.x, point.y, point.z, normal.x, normal.y, normal.z, MenuRay.MaxDistance, out distance);
+        if (!hit)
+            return false;
+
+        world = origin + direction * distance;
+        var onCanvas = canvas.InverseTransformPoint(world);
+        local = new Vector2(onCanvas.x, onCanvas.y);
+        return true;
     }
 
     public bool IsOver(RectTransform rect)
@@ -149,21 +173,14 @@ public class XRRayInteractorManager : MonoBehaviour
 
     public Vector2 GetUIHitPosition(RectTransform? rect)
     {
+        var (interactor, _) = GetActiveInteractor();
+        var canvas = MenuPlacement.Current;
+        if (interactor != null && canvas != null &&
+            MenuPlaneHit(interactor.transform, canvas, out _, out var local))
+            return local;
+
         if (rect != null && TryHit(rect, out var world))
             return LocalOnCanvas(rect, world);
-
-        var (interactor, _) = GetActiveInteractor();
-        if (interactor != null && interactor.TryGetCurrentUIRaycastResult(out var result) && result.gameObject != null)
-        {
-            var space = rect != null
-                ? rect.GetComponentInParent<Canvas>()?.transform ?? rect
-                : result.gameObject.GetComponentInParent<Canvas>()?.transform;
-            if (space != null)
-            {
-                var local = space.InverseTransformPoint(result.worldPosition);
-                return new Vector2(local.x, local.y);
-            }
-        }
 
         return Vector2.one * -1000;
     }

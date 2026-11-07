@@ -45,7 +45,7 @@ internal static class UIPatches
         if (manager == null || !manager.TryAimPoint(out var world))
             return;
 
-        var canvas = HUDCanvas.instance.GetComponent<RectTransform>();
+        var canvas = MenuPlacement.Current != null ? MenuPlacement.Current : HUDCanvas.instance.GetComponent<RectTransform>();
         __instance.transform.SetPositionAndRotation(world, canvas.rotation);
         __instance.showTimer = 0.2f;
         if (__instance.mesh != null)
@@ -71,20 +71,7 @@ internal static class UIPatches
     }
 
     /// <summary>
-    /// 1.3.10 returned false here whenever the interaction toolkit had no stored UI hit.
-    /// The line was visible and hover never reached the button test. The patched body
-    /// compares <see cref="XRRayInteractorManager.GetUIHitPosition"/>, which falls back
-    /// to the controller ray. This prefix only records the first button that ray crosses.
-    /// </summary>
-    [HarmonyPatch(typeof(SemiFunc), nameof(SemiFunc.UIMouseHover))]
-    [HarmonyPrefix]
-    private static void UIPointerHoverOtherCanvasPatch(RectTransform rectTransform)
-    {
-        XRRayInteractorManager.Instance?.IsOver(rectTransform);
-    }
-
-    /// <summary>
-    /// Detect UI hits using VR pointers instead of mouse cursor
+    /// The game's own hover runs. The mouse position it reads is the controller ray on the menu plane.
     /// </summary>
     [HarmonyPatch(typeof(SemiFunc), nameof(SemiFunc.UIMouseHover))]
     [HarmonyTranspiler]

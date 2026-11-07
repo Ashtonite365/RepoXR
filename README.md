@@ -1,8 +1,8 @@
-# RepoXR FBT
+# RepoFBT
 
-**RepoXR FBT** is a GPL-3.0 fork of [RepoXR by DaXcess](https://github.com/DaXcess/RepoXR) with optional 3-point full-body tracking. This repository is [Ashtonite365/RepoXR](https://github.com/Ashtonite365/RepoXR). It is not the official Thunderstore package [`DaXcess-RepoXR`](https://thunderstore.io/c/repo/p/DaXcess/RepoXR). Do not install both plugins in the same BepInEx folder.
+**RepoFBT** is a GPL-3.0 fork of [RepoXR by DaXcess](https://github.com/DaXcess/RepoXR) with optional 3-point full-body tracking. This repository is [Ashtonite365/RepoXR](https://github.com/Ashtonite365/RepoXR). It is not the official Thunderstore package [`DaXcess-RepoXR`](https://thunderstore.io/c/repo/p/DaXcess/RepoXR). Do not install both plugins in the same BepInEx folder.
 
-The BepInEx plugin id is `io.ashtonite.repoxr.fbt` (`RepoXR FBT`). It still builds `RepoXR.dll` / `RepoXR.Preload.dll` and uses the same `BepInEx/plugins/RepoXR` install layout, including the upstream runtime dependencies and asset bundle. Upstream's preload path is the one historically shipped as LCVR; keep that attribution when you redistribute a build.
+The BepInEx plugin id is `io.ashtonite.repoxr.fbt` (`RepoFBT`). It still builds `RepoXR.dll` / `RepoXR.Preload.dll` and uses the same `BepInEx/plugins/RepoXR` install layout, including the upstream runtime dependencies and asset bundle. Upstream's preload path is the one historically shipped as LCVR; keep that attribution when you redistribute a build.
 
 Original RepoXR is a fully fledged R.E.P.O. VR mod that adds full 6-DoF motion controlled VR support to R.E.P.O. Full-body tracking is off unless you enable it. Setup, SteamVR/SlimeVR roles, calibration, and who can see the extra bones are documented in [FBT.md](FBT.md).
 
@@ -30,6 +30,7 @@ Here is a list of RepoXR versions and which version(s) of R.E.P.O. it supports
 
 | RepoXR FBT | R.E.P.O. Version |
 |------------|------------------|
+| v1.3.16 (stationary game menu; cursor follows the controller plane) | v0.5.1 |
 | v1.3.15 (menu content centred; screen overlay off the mirror) | v0.5.1 |
 | v1.3.14 (main menu page chooses its canvas) | v0.5.1 |
 | v1.3.13 (menu camera stays in the game hierarchy) | v0.5.1 |

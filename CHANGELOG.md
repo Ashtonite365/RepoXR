@@ -1,3 +1,11 @@
+# 1.3.16 (RepoFBT)
+
+**Fixes**:
+- The menu is the game's own HUD Canvas, including `Menu Page Main(Clone)` and whatever else that canvas is already drawing. It is not a rebuilt button list. 1.3.15 shifted it by child bounds `contentCenter=(345,202.5)` and then detached a stretch rect (`pivot=(0,0)`, anchors `(0,0)`–`(1,1)`). The content point still projected to `(0.5,0.5,1.4)`, and the cursor-follow line never logged, because that rect does not survive leaving its parent. The canvas size is frozen to a fixed centre pivot before it is placed, the whole canvas is centred 1.4 m in front of the camera, and it stays in the world.
+- The controller ray is tested against that plane. The hit is the position the game's own hover and click already read. The trigger is still the mouse button. The visible menu cursor moves to the same hit. A miss leaves the mouse position.
+- The display name is RepoFBT. The id stays `io.ashtonite.repoxr.fbt`, the file stays `RepoXR.dll`, and the config file is unchanged. DaXcess remains the upstream author.
+- `UI/UI/Canvas` is disabled at scene load and that disable is logged. The 1.3.14 `xrEndFrame` `XR_ERROR_HANDLE_INVALID` lines start after focus was lost at 14:34:17. They are not treated as the cause of the missing menu.
+
 # 1.3.15 (RepoXR FBT fork)
 
 **Fixes**:

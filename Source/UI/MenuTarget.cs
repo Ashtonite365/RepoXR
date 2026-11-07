@@ -31,10 +31,33 @@ internal static class MenuTarget
     }
 
     /// <summary>
-    /// Canvas-local position that puts content, measured from the canvas pivot, on the view centre.
-    /// Positive content Y is above the pivot, so the canvas moves down.
+    /// Canvas-local position that puts a point measured from the pivot on the view centre.
     /// </summary>
     internal static (float x, float y, float z) LocalPositionForContent(float contentCenterX, float contentCenterY,
         float scale, float distance) =>
         (-contentCenterX * scale, -contentCenterY * scale, distance);
+
+    internal static float ScaleToFit(float pixelWidth, float pixelHeight, float maxWidth, float maxHeight)
+    {
+        var sx = ScaleForWidth(pixelWidth, maxWidth);
+        var sy = ScaleForWidth(pixelHeight, maxHeight);
+        return sx < sy ? sx : sy;
+    }
+
+    internal static bool RayPlane(float ox, float oy, float oz, float dx, float dy, float dz,
+        float px, float py, float pz, float nx, float ny, float nz, float maxDistance, out float distance)
+    {
+        var denom = nx * dx + ny * dy + nz * dz;
+        if (denom > -1e-5f && denom < 1e-5f)
+        {
+            distance = 0f;
+            return false;
+        }
+
+        distance = (nx * (px - ox) + ny * (py - oy) + nz * (pz - oz)) / denom;
+        return distance > 0.02f && distance < maxDistance;
+    }
+
+    internal static bool CoversDesktopMirror(bool isPresentedMenu, bool screenOverlay) =>
+        !isPresentedMenu && screenOverlay;
 }

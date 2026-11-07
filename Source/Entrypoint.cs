@@ -27,8 +27,13 @@ internal static class Entrypoint
         // while the headset still draws the world cameras. The menu page is under HUD Canvas.
         var blocking = GameObject.Find("UI/UI/Canvas");
         var blockingCanvas = blocking != null ? blocking.GetComponent<Canvas>() : null;
-        if (blockingCanvas != null)
+        if (blockingCanvas != null && blockingCanvas.enabled)
+        {
             blockingCanvas.enabled = false;
+            Logger.LogInfo(
+                "Desktop mirror: disabled screen canvas 'UI/UI/Canvas' (" + blockingCanvas.renderMode +
+                "). It draws on the game window and is not the HUD menu.");
+        }
 
         var canvas = GameObject.Find("UI/HUD/HUD Canvas").transform;
         var fade = canvas.Find("Fade");
