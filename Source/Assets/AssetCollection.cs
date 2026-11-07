@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using JetBrains.Annotations;
@@ -15,6 +16,7 @@ namespace RepoXR.Assets;
 internal static class AssetCollection
 {
     private static AssetBundle assetBundle;
+    static readonly Dictionary<string, LocalizedAsset> localizedByKey = new();
 
     public static OpenXRFeaturePack OpenXRFeatures;
 
@@ -149,12 +151,94 @@ internal static class AssetCollection
             catalog.WaitForCompletion();
 
             if (catalog.Status != AsyncOperationStatus.Succeeded)
-                Logger.LogWarning(catalogMessage);
+            {
+                var indexed = IndexLocalizedBundles();
+                Logger.LogInfo(indexed > 0
+                    ? $"Addressables rejected catalog_0.1.json. Loaded {indexed} VR string asset(s) from the local bundles instead."
+                    : catalogMessage);
+            }
         }
         catch (Exception ex)
         {
-            Logger.LogWarning($"{catalogMessage} ({ex.GetType().Name}: {ex.Message})");
+            var indexed = IndexLocalizedBundles();
+            Logger.LogInfo(indexed > 0
+                ? $"Addressables rejected catalog_0.1.json ({ex.GetType().Name}). Loaded {indexed} VR string asset(s) from the local bundles instead."
+                : $"{catalogMessage} ({ex.GetType().Name}: {ex.Message})");
         }
+    }
+
+    public static LocalizedAsset FindLocalizedInBundle(string key)
+    {
+        if (string.IsNullOrEmpty(key))
+            return null;
+
+        if (localizedByKey.TryGetValue(key, out var cached))
+            return cached;
+
+        var found = LoadLocalized(assetBundle, key);
+        if (found != null)
+        {
+            localizedByKey[key] = found;
+            return found;
+        }
+
+        if (!Directory.Exists(AddressablesPath))
+            return null;
+
+        foreach (var file in Directory.GetFiles(AddressablesPath, "*.bundle"))
+        {
+            var bundle = AssetBundle.LoadFromFile(file);
+            found = LoadLocalized(bundle, key);
+            if (found == null)
+                continue;
+
+            localizedByKey[key] = found;
+            return found;
+        }
+
+        return null;
+    }
+
+    static int IndexLocalizedBundles()
+    {
+        var count = 0;
+        if (!Directory.Exists(AddressablesPath))
+            return count;
+
+        foreach (var file in Directory.GetFiles(AddressablesPath, "*.bundle"))
+        {
+            var bundle = AssetBundle.LoadFromFile(file);
+            if (bundle == null)
+                continue;
+
+            foreach (var path in bundle.GetAllAssetNames())
+            {
+                if (bundle.LoadAsset<LocalizedAsset>(path) != null)
+                    count++;
+            }
+        }
+
+        return count;
+    }
+
+    static LocalizedAsset LoadLocalized(AssetBundle bundle, string key)
+    {
+        if (bundle == null)
+            return null;
+
+        foreach (var path in bundle.GetAllAssetNames())
+        {
+            var file = Path.GetFileNameWithoutExtension(path);
+            if (file.IndexOf(key, StringComparison.OrdinalIgnoreCase) < 0 &&
+                path.IndexOf(key, StringComparison.OrdinalIgnoreCase) < 0)
+                continue;
+
+            var asset = bundle.LoadAsset<LocalizedAsset>(path);
+            if (asset != null)
+                return asset;
+        }
+
+        return null;
     }
 
     public static AsyncOperationHandle<LocalizedAsset> GetLocalizedAsset(string name)

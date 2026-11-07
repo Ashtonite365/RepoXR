@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Reflection.Emit;
 using HarmonyLib;
 using RepoXR.Assets;
@@ -288,22 +289,6 @@ internal static class InputPatches
     }
 
     /// <summary>
-    /// Prevent the addition of underlines in the input text
-    /// </summary>
-    [HarmonyPatch(typeof(InputManager), nameof(InputManager.InputDisplayReplaceTags))]
-    [HarmonyPrefix]
-    private static bool NoUnderlinePatch(InputManager __instance, ref string __result, ref string _text)
-    {
-        _text = __instance.tagDictionary.Aggregate(_text,
-            (current, keyValuePair) => current.Replace(keyValuePair.Key,
-                __instance.InputDisplayGet(keyValuePair.Value, MenuKeybind.KeyType.InputKey, MovementDirection.Up)));
-
-        __result = _text;
-
-        return false;
-    }
-
-    /// <summary>
     /// Make the reset controls button reset only the VR controls, and keep flatscreen controls as-is
     /// </summary>
     [HarmonyPatch(typeof(MenuPageSettingsControls), nameof(MenuPageSettingsControls.ResetControls))]
@@ -314,9 +299,101 @@ internal static class InputPatches
 
         return false;
     }
+}
 
-    #region Mouse Input Patches
+/// <summary>
+/// 0.4.4 returns the replaced string. Skip the original so the underline prefix and suffix are not applied.
+/// </summary>
+[RepoXRPatch]
+internal static class InputUnderlineStringPatches
+{
+    [HarmonyPrepare]
+    static bool Prepare() => InputDisplayTags.ReturnsString();
 
+    [HarmonyPatch(typeof(InputManager), nameof(InputManager.InputDisplayReplaceTags))]
+    [HarmonyPrefix]
+    static bool Prefix(InputManager __instance, ref string __result, ref string _text)
+    {
+        __result = InputDisplayTags.Replace(__instance, _text);
+        return false;
+    }
+}
+
+/// <summary>
+/// 0.5.1 changed InputDisplayReplaceTags to void. A prefix must not declare __result.
+/// Substitute the tags first, then let the original store the text.
+/// </summary>
+[RepoXRPatch]
+internal static class InputUnderlineVoidPatches
+{
+    [HarmonyPrepare]
+    static bool Prepare() => InputDisplayTags.ReturnsVoid();
+
+    [HarmonyPatch(typeof(InputManager), nameof(InputManager.InputDisplayReplaceTags))]
+    [HarmonyPrefix]
+    static void Prefix(InputManager __instance, ref string _text)
+    {
+        _text = InputDisplayTags.Replace(__instance, _text);
+    }
+}
+
+internal static class InputDisplayTags
+{
+    internal static MethodInfo ReplaceTagsMethod() =>
+        typeof(InputManager).GetMethod(nameof(InputManager.InputDisplayReplaceTags),
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public |
+            System.Reflection.BindingFlags.NonPublic, null,
+            [typeof(string), typeof(string), typeof(string)], null);
+
+    internal static bool ReturnsString()
+    {
+        var method = ReplaceTagsMethod();
+        return method != null && method.ReturnType == typeof(string);
+    }
+
+    internal static bool ReturnsVoid()
+    {
+        var method = ReplaceTagsMethod();
+        return method != null && method.ReturnType == typeof(void);
+    }
+
+    internal static string Replace(string text, IReadOnlyDictionary<string, string> tags)
+    {
+        if (text == null || tags == null)
+            return text;
+
+        foreach (var pair in tags)
+            text = text.Replace(pair.Key, pair.Value ?? "");
+
+        return text;
+    }
+
+    internal static string Replace(InputManager manager, string text)
+    {
+        if (manager?.tagDictionary == null)
+            return text;
+
+        var shown = new Dictionary<string, string>();
+        foreach (var pair in manager.tagDictionary)
+        {
+            var action = manager.GetAction(pair.Value);
+            shown[pair.Key] = action == null
+                ? "Unassigned"
+                : manager.InputDisplayGetString(action,
+                    action.GetBindingIndex(VRInputSystem.Instance.CurrentControlScheme));
+        }
+
+        return Replace(text, shown);
+    }
+}
+
+/// <summary>
+/// Controller trigger stands in for the mouse on menu widgets. Kept apart from the
+/// input-display patches so a signature change there cannot drop hover and clicks.
+/// </summary>
+[RepoXRPatch]
+internal static class InputMousePatches
+{
     [HarmonyPatch(typeof(MenuButton), nameof(MenuButton.HoverLogic))]
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> PatchHoverLogicMouseInputs(IEnumerable<CodeInstruction> instructions) =>
@@ -424,13 +501,14 @@ internal static class InputPatches
         var matchButtonDown = new CodeMatch(OpCodes.Call,
             Method(typeof(UnityEngine.Input), nameof(UnityEngine.Input.GetMouseButtonDown), [typeof(int)]));
 
-        return matcher
-            .MatchForward(false, matchButton)
-            .Repeat(m => m.SetOperandAndAdvance(((Func<int, bool>)GetMouseButtonVR).Method))
-            .Start()
-            .MatchForward(false, matchButtonDown)
-            .Repeat(m => m.SetOperandAndAdvance(((Func<int, bool>)GetMouseButtonDownVR).Method));
-    }
+        matcher.MatchForward(false, matchButton);
+        if (!matcher.IsInvalid)
+            matcher.Repeat(m => m.SetOperandAndAdvance(((Func<int, bool>)GetMouseButtonVR).Method));
 
-    #endregion
+        matcher.Start().MatchForward(false, matchButtonDown);
+        if (!matcher.IsInvalid)
+            matcher.Repeat(m => m.SetOperandAndAdvance(((Func<int, bool>)GetMouseButtonDownVR).Method));
+
+        return matcher;
+    }
 }

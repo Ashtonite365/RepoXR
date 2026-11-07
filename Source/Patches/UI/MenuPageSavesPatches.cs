@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
 using RepoXR.UI.Menu;
@@ -6,9 +7,8 @@ using RepoXR.UI.Menu;
 namespace RepoXR.Patches.UI;
 
 /// <summary>
-/// Close the VR keyboard when a save is renamed. 0.5.x removed MenuPageSavesRename.
-/// The type name must be resolved with AccessTools, not [HarmonyPatch("MenuPageSavesRename")],
-/// which looks the name up in 0Harmony and throws TypeLoadException.
+/// Close the VR keyboard when a save rename finishes. 0.4.4 used MenuPageSavesRename.
+/// 0.5.1 folded that page into MenuPageSaves, so leaving the page closes the keyboard.
 /// </summary>
 [RepoXRPatch]
 internal static class MenuPageSavesPatches
@@ -25,17 +25,46 @@ internal static class MenuPageSavesPatches
     [HarmonyTargetMethods]
     static IEnumerable<MethodBase> TargetMethods()
     {
-        var type = AccessTools.TypeByName("MenuPageSavesRename");
-        if (type == null)
-            yield break;
-
-        foreach (var name in new[] { "ButtonConfirm", "ExitPage" })
+        var rename = GameType("MenuPageSavesRename");
+        if (rename != null)
         {
-            var method = AccessTools.DeclaredMethod(type, name);
-            if (method != null)
-                yield return method;
+            foreach (var name in new[] { "ButtonConfirm", "ExitPage" })
+            {
+                var method = Method(rename, name);
+                if (method != null)
+                    yield return method;
+            }
         }
+
+        var leave = Method(typeof(MenuPageSaves), "OnGoBack");
+        if (leave != null)
+            yield return leave;
     }
+
+    internal static Type GameType(string name)
+    {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            Type type;
+            try
+            {
+                type = assembly.GetType(name, false);
+            }
+            catch (ReflectionTypeLoadException)
+            {
+                continue;
+            }
+
+            if (type != null)
+                return type;
+        }
+
+        return null;
+    }
+
+    static MethodInfo Method(Type type, string name) =>
+        type?.GetMethod(name,
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
 
     [HarmonyPostfix]
     static void CloseKeyboard()

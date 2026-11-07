@@ -1,3 +1,13 @@
+# 1.3.9 (RepoXR FBT fork)
+
+**Fixes**:
+- The main-menu controller pointer. `InputDisplayReplaceTags` is void on 0.5.1, and the old prefix asked Harmony for a string result. That aborted every later patch in `InputPatches`, including the trigger rewrites menu hover and clicks use. The void and string signatures are patched separately, and the trigger rewrites live in their own class. The flat menu cursor stays until the controller ray exists. Menu canvas setup can fail without skipping ray creation, and a missing ray is logged once.
+- `GetOverrideActive` no longer throws every frame when a menu camera has no player or the VR position driver is not ready. A real local override still wins.
+- `PhysGrabber.ObjectTurning` no longer deletes a fixed 10-instruction window. Mouse X/Y axis calls are replaced in place, and a miss cannot take down the rest of the grabber patches.
+- Save rename and server-list keyboards close through the 0.5.1 page methods. `PasswordTextSet` and `PostProcessing.Start` stay on their 0.5.1 equivalents (`MenuTextInput.InputTextSet`, `GraphicsManager` lens and chromatic prefixes) when those old methods are absent.
+- The debug tester label adds `(VR)` to whatever `{0}` / `{1}` format this build uses.
+- Tutorial strings are loaded from the local asset bundles when Unity 6 rejects `catalog_0.1.json`. Desktop wording is left in place when a string asset is not actually there.
+
 # 1.3.8 (RepoXR FBT fork)
 
 **Fixes**:

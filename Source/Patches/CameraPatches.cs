@@ -120,9 +120,13 @@ internal static class CameraPatches
     [HarmonyPrefix]
     private static bool GetOverrideActivePatch(PlayerLocalCamera __instance, ref bool __result)
     {
-        __result = __instance.clientPositionOverride ||
-                   (__instance.playerAvatar.isLocal && VRCameraPosition.instance.overridePositionActive);
+        if (__instance == null)
+            return true;
 
+        var position = VRCameraPosition.instance;
+        __result = CameraOverride.IsActive(__instance.clientPositionOverride, __instance.playerAvatar != null,
+            __instance.playerAvatar != null && __instance.playerAvatar.isLocal, position != null,
+            position != null && position.overridePositionActive);
         return false;
     }
 

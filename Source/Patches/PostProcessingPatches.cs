@@ -29,8 +29,18 @@ internal static class PostProcessingPatches
 internal static class PostProcessingStartPatches
 {
     [HarmonyPrepare]
-    private static bool Prepare() =>
-        AccessTools.DeclaredMethod(typeof(PostProcessing), nameof(PostProcessing.Start)) != null;
+    private static bool Prepare()
+    {
+        var method = typeof(PostProcessing).GetMethod(nameof(PostProcessing.Start),
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public |
+            System.Reflection.BindingFlags.NonPublic);
+        if (method != null)
+            return true;
+
+        Logger.LogInfo(
+            "PostProcessing.Start is not on this build. Lens distortion and chromatic aberration stay disabled through GraphicsManager.");
+        return false;
+    }
 
     [HarmonyPatch(typeof(PostProcessing), nameof(PostProcessing.Start))]
     [HarmonyPostfix]

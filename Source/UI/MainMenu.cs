@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using RepoXR.Input;
 using RepoXR.Player.Camera;
 using UnityEngine;
@@ -30,11 +31,28 @@ public class MainMenu : MonoBehaviour
     private IEnumerator Start()
     {
         yield return null;
-        
-        DisableEventSystem();
-        SetupMainCamera();
-        SetupMainCanvas();
-        SetupControllers();
+
+        RunStep("menu event system", DisableEventSystem);
+        RunStep("menu camera", SetupMainCamera);
+        RunStep("menu canvas", SetupMainCanvas);
+        RunStep("controller pointer", SetupControllers);
+
+        if (XRRayInteractorManager.Instance == null)
+            Logger.LogWarning("Menu controller pointer was not created. The game cursor stays available.");
+        else
+            Logger.LogInfo("Menu controller pointer is ready.");
+    }
+
+    static void RunStep(string name, Action step)
+    {
+        try
+        {
+            step();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Menu setup step '{name}' failed ({ex.GetType().Name}: {ex.Message}).");
+        }
     }
     
     private static void DisableEventSystem()
@@ -81,11 +99,18 @@ public class MainMenu : MonoBehaviour
 
         // Move top menu selection outline
         var selection = FindObjectOfType<MenuSelectionBoxTop>(true);
-        selection.transform.parent.parent = selection.transform.parent.parent.parent;
+        if (selection != null)
+            selection.transform.parent.parent = selection.transform.parent.parent.parent;
     }
 
     private void SetupControllers()
     {
+        if (mainCamera == null || mainCamera.transform.parent == null)
+            throw new InvalidOperationException("the VR camera rig is not ready");
+
+        if (mainCamera.transform.parent.GetComponent<XRRayInteractorManager>() != null)
+            return;
+
         mainCamera.transform.parent.gameObject.AddComponent<XRRayInteractorManager>();
     }
 

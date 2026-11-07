@@ -34,8 +34,35 @@ internal static class MenuPatches
         if (!SemiFunc.MenuLevel() && !VRSession.InVR)
             return;
         
-        var vrButton = Object.Instantiate(AssetCollection.VRSettingsButton, __instance.transform)
-            .GetComponent<Button>();
+        var prefab = AssetCollection.VRSettingsButton;
+        if (prefab == null)
+        {
+            Logger.LogWarning("VR settings button prefab is missing.");
+            return;
+        }
+
+        var wasActive = prefab.activeSelf;
+        prefab.SetActive(false);
+        GameObject buttonObject;
+        try
+        {
+            buttonObject = Object.Instantiate(prefab, __instance.transform);
+        }
+        finally
+        {
+            prefab.SetActive(wasActive);
+        }
+
+        foreach (var label in buttonObject.GetComponentsInChildren<TMPro.TMP_Text>(true))
+        {
+            if (label.font == null && TMPro.TMP_Settings.defaultFontAsset != null)
+                label.font = TMPro.TMP_Settings.defaultFontAsset;
+        }
+
+        buttonObject.SetActive(true);
+        var vrButton = buttonObject.GetComponent<Button>();
+        if (vrButton == null)
+            return;
         var vrRect = vrButton.GetComponent<RectTransform>();
 
         // Brute forcing element positions

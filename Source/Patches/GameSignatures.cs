@@ -75,7 +75,7 @@ internal static class GameSignatures
 
             return matcher.InstructionEnumeration().ToList();
         }
-        catch (Exception ex) when (ex is ArgumentOutOfRangeException or InvalidOperationException
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException
                                        or IndexOutOfRangeException or NullReferenceException)
         {
             Logger.LogWarning(

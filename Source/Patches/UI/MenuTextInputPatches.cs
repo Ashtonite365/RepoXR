@@ -76,16 +76,26 @@ internal static class ServerListKeyboardPatches
     {
         foreach (var typeName in new[] { "MenuPageServerListCreateNew", "MenuPageServerListSearch" })
         {
-            var type = AccessTools.TypeByName(typeName);
+            var type = MenuPageSavesPatches.GameType(typeName);
             if (type == null)
                 continue;
 
             foreach (var name in new[] { "ButtonConfirm", "ExitPage" })
             {
-                var method = AccessTools.DeclaredMethod(type, name);
+                var method = type.GetMethod(name,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
                 if (method != null)
                     yield return method;
             }
+        }
+
+        // 0.5.1 keeps create and search on the server list itself.
+        foreach (var name in new[] { "ExitPage", "SetSearch" })
+        {
+            var method = typeof(MenuPageServerList).GetMethod(name,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+            if (method != null)
+                yield return method;
         }
     }
 

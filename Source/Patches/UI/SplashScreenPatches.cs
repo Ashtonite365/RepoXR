@@ -39,6 +39,9 @@ internal static class SplashScreenPatches
     [HarmonyPostfix]
     private static void LogoAnimationPatch(SplashScreen __instance)
     {
+        if (logoTransform == null || SplashScreenUI.instance == null || SplashScreenUI.instance.semiworkTransform == null)
+            return;
+
         logoTransform.localPosition = SplashScreenUI.instance.semiworkTransform.localPosition + Vector3.down * 80;
     }
     
@@ -49,6 +52,9 @@ internal static class SplashScreenPatches
     [HarmonyPostfix]
     private static void SetFadeOverlayPatch(SplashScreen __instance)
     {
+        if (logoTransform == null || SplashScreenUI.instance == null || SplashScreenUI.instance.semiworkTransform == null)
+            return;
+
         logoTransform.gameObject.SetActive(SplashScreenUI.instance.semiworkTransform.gameObject.activeSelf);
         
         FadeOverlay.Instance.Image.color = new Color(0, 0, 0, 1);

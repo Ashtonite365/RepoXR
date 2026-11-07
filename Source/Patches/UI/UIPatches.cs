@@ -23,8 +23,11 @@ internal static class UIPatches
     [HarmonyPrefix]
     private static bool MenuCursorVRPatch(MenuCursor __instance)
     {
-        __instance.gameObject.SetActive(false);
+        // Keep the game cursor until the controller ray exists. Hiding it first leaves the menu with no pointer.
+        if (XRRayInteractorManager.Instance is null)
+            return true;
 
+        __instance.gameObject.SetActive(false);
         return false;
     }
 

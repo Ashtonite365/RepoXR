@@ -114,25 +114,22 @@ internal static class PhysGrabberPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> ObjectTurningPatches(IEnumerable<CodeInstruction> instructions)
     {
-        // Hard-coded local slots from 0.4.4. If "Mouse X" moved, leave turning alone
-        // instead of emitting ldloca against locals this build does not have.
-        return GameSignatures.EditOrOriginal(instructions, "PhysGrabber object turning", matcher => matcher
-            .MatchForward(false, new CodeMatch(OpCodes.Ldstr, "Mouse X"))
-            .RemoveInstructions(10)
-            .Insert(
-                new CodeInstruction(OpCodes.Ldloca_S, Plugin.GameDebugBuild ? 13 : 5),
-                new CodeInstruction(OpCodes.Ldloca_S, Plugin.GameDebugBuild ? 14 : 6),
-                new CodeInstruction(OpCodes.Call, Method(typeof(PhysGrabberPatches), nameof(GetRotationInput)))
-            ));
+        var list = new List<CodeInstruction>(instructions);
+        var replaced = MouseAxisRewrite.Replace(list,
+            Method(typeof(PhysGrabberPatches), nameof(StickX)),
+            Method(typeof(PhysGrabberPatches), nameof(StickY)));
+        if (replaced == 0)
+            Logger.LogInfo(
+                "PhysGrabber.ObjectTurning has no Mouse X/Y axis read on this build. Turning stays on the game's own input.");
+        else
+            Logger.LogInfo($"PhysGrabber.ObjectTurning reads the controller for {replaced} mouse axis call(s).");
+
+        return list;
     }
 
-    private static void GetRotationInput(out float x, out float y)
-    {
-        var input = Actions.Instance["Rotation"].ReadValue<Vector2>();
+    static float StickX() => Actions.Instance["Rotation"].ReadValue<Vector2>().x;
 
-        x = input.x;
-        y = input.y;
-    }
+    static float StickY() => Actions.Instance["Rotation"].ReadValue<Vector2>().y;
 
     /// <summary>
     /// Allow a custom override to disable object turning
@@ -141,22 +138,20 @@ internal static class PhysGrabberPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> DisableTurningPatch(IEnumerable<CodeInstruction> instructions)
     {
-        var matcher = new CodeMatcher(instructions)
-            .MatchForward(false, new CodeMatch(OpCodes.Call, Method(typeof(SemiFunc), nameof(SemiFunc.InputHold))))
-            .Advance(1);
+        return GameSignatures.EditOrOriginal(instructions, "PhysGrabber disable turning", matcher =>
+        {
+            matcher.MatchForward(false, new CodeMatch(OpCodes.Call, Method(typeof(SemiFunc), nameof(SemiFunc.InputHold))))
+                .Advance(1);
 
-        var jmp = matcher.Instruction;
-
-        matcher.Advance(1).InsertAndAdvance(
-            new CodeInstruction(OpCodes.Call, PropertyGetter(typeof(VRSession), nameof(VRSession.Instance))),
-            new CodeInstruction(OpCodes.Callvirt, PropertyGetter(typeof(VRSession), nameof(VRSession.Player))),
-            new CodeInstruction(OpCodes.Ldfld, Field(typeof(VRPlayer), nameof(VRPlayer.disableRotateTimer))),
-            new CodeInstruction(OpCodes.Ldc_R4, 0f),
-            new CodeInstruction(OpCodes.Bgt_Un_S, jmp.operand)
-        );
-
-        return matcher
-            .InstructionEnumeration();
+            var jmp = matcher.Instruction;
+            return matcher.Advance(1).InsertAndAdvance(
+                new CodeInstruction(OpCodes.Call, PropertyGetter(typeof(VRSession), nameof(VRSession.Instance))),
+                new CodeInstruction(OpCodes.Callvirt, PropertyGetter(typeof(VRSession), nameof(VRSession.Player))),
+                new CodeInstruction(OpCodes.Ldfld, Field(typeof(VRPlayer), nameof(VRPlayer.disableRotateTimer))),
+                new CodeInstruction(OpCodes.Ldc_R4, 0f),
+                new CodeInstruction(OpCodes.Bgt_Un_S, jmp.operand)
+            );
+        });
     }
 
     /// <summary>

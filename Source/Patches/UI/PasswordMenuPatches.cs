@@ -38,8 +38,18 @@ internal static class PasswordMenuPatches
 internal static class PasswordTextCursorPatches
 {
     [HarmonyPrepare]
-    static bool Prepare() =>
-        AccessTools.DeclaredMethod(typeof(MenuPagePassword), nameof(MenuPagePassword.PasswordTextSet)) != null;
+    static bool Prepare()
+    {
+        var method = typeof(MenuPagePassword).GetMethod(nameof(MenuPagePassword.PasswordTextSet),
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public |
+            System.Reflection.BindingFlags.NonPublic);
+        if (method != null)
+            return true;
+
+        Logger.LogInfo(
+            "MenuPagePassword.PasswordTextSet is not on this build. The VR text cursor stays on MenuTextInput.InputTextSet.");
+        return false;
+    }
 
     [HarmonyPatch(typeof(MenuPagePassword), nameof(MenuPagePassword.PasswordTextSet))]
     [HarmonyTranspiler]

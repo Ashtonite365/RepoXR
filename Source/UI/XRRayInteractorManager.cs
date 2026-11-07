@@ -23,22 +23,34 @@ public class XRRayInteractorManager : MonoBehaviour
     private void Awake()
     {
         Instance = this;
-        
-        (leftActions, leftInteractor, leftRenderer) = CreateInteractorController("Left");
-        (rightActions, rightInteractor, rightRenderer) = CreateInteractorController("Right");
-        
-        leftActions.uiPressAction.action.performed += LeftControllerPressed;
-        rightActions.uiPressAction.action.performed += RightControllerPressed;
-        
-        UpdateActiveController(ActiveController.Right);
+
+        try
+        {
+            (leftActions, leftInteractor, leftRenderer) = CreateInteractorController("Left");
+            (rightActions, rightInteractor, rightRenderer) = CreateInteractorController("Right");
+
+            leftActions.uiPressAction.action.performed += LeftControllerPressed;
+            rightActions.uiPressAction.action.performed += RightControllerPressed;
+
+            UpdateActiveController(ActiveController.Right);
+        }
+        catch (Exception ex)
+        {
+            Instance = null;
+            Logger.LogWarning($"Controller pointer was not bound ({ex.GetType().Name}: {ex.Message}).");
+            enabled = false;
+        }
     }
 
     private void OnDestroy()
     {
-        Instance = null;
-        
-        leftActions.uiPressAction.action.performed -= LeftControllerPressed;
-        rightActions.uiPressAction.action.performed -= RightControllerPressed;
+        if (Instance == this)
+            Instance = null;
+
+        if (leftActions != null && leftActions.uiPressAction.action != null)
+            leftActions.uiPressAction.action.performed -= LeftControllerPressed;
+        if (rightActions != null && rightActions.uiPressAction.action != null)
+            rightActions.uiPressAction.action.performed -= RightControllerPressed;
     }
 
     public void SetVisible(bool visible)
@@ -217,7 +229,9 @@ public class XRRayInteractorManager : MonoBehaviour
         renderer.sortingOrder = 4;
 
         renderer.material = AssetCollection.DefaultLine;
-        
+        if (renderer.material == null)
+            throw new InvalidOperationException("the controller line material is missing");
+
         AddActionBasedControllerBinds(controller, hand);
         
         return (controller, interactor, renderer);
