@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using UnityEngine;
 using UnityEngine.UI;
@@ -21,13 +22,13 @@ internal static class MenuPlacement
     internal static RectTransform Current { get; private set; }
     internal static RectTransform Display { get; private set; }
 
-    internal static void Present(MenuPageMain page)
+    internal static bool Present(MenuPageMain page)
     {
         if (page == null)
-            return;
+            return false;
 
-        if (presentedId == page.GetInstanceID() && Current != null)
-            return;
+        if (presentedId == page.GetInstanceID() && Current != null && Display != null)
+            return true;
 
         var canvases = page.GetComponentsInParent<Canvas>(true);
         var canvas = canvases != null && canvases.Length > 0 ? canvases[0] : null;
@@ -41,7 +42,7 @@ internal static class MenuPlacement
                 Logger.LogInfo("MenuPageMain has no parent canvas yet. HUD Canvas was not moved.");
             }
 
-            return;
+            return false;
         }
 
         var rect = canvas.GetComponent<RectTransform>();
@@ -62,7 +63,7 @@ internal static class MenuPlacement
         if (camera == null)
         {
             Logger.LogInfo("Menu page '" + page.name + "' is on '" + canvas.name + "', and Camera Main was not ready.");
-            return;
+            return false;
         }
 
         // Leave the game's anchors, pivot, and children alone. Draw that canvas into a
@@ -109,9 +110,20 @@ internal static class MenuPlacement
         image.texture = texture;
         image.raycastTarget = false;
 
-        display.SetPositionAndRotation(
-            camera.transform.position + camera.transform.forward * DistanceMeters,
-            camera.transform.rotation);
+        if (!TrySceneAnchor(camera, out var anchorName, out var truckPosition, out var standPosition, out var left,
+                out var place, out var alongLeft))
+        {
+            Logger.LogInfo("Menu plane was not placed. No truck anchor was found in the main menu scene.");
+            UnityEngine.Object.Destroy(displayObject);
+            UnityEngine.Object.Destroy(capture);
+            return false;
+        }
+
+        var toPlane = place - standPosition;
+        toPlane.y = 0f;
+        if (toPlane.sqrMagnitude < 0.01f)
+            toPlane = -left;
+        display.SetPositionAndRotation(place, Quaternion.LookRotation(toPlane.normalized, Vector3.up));
         display.SetParent(null, true);
 
         Current = rect;
@@ -130,12 +142,19 @@ internal static class MenuPlacement
             " pagePivot=" + (pageRect != null ? Format(pageRect.pivot) : "(none)") +
             " pageAnchorMin=" + (pageRect != null ? Format(pageRect.anchorMin) : "(none)") +
             " pageAnchorMax=" + (pageRect != null ? Format(pageRect.anchorMax) : "(none)") +
-            " planePos=" + Format(display.position) +
+            " anchor='" + anchorName +
+            "' truckPos=" + Format(truckPosition) +
+            " standPos=" + Format(standPosition) +
+            " left=" + Format(left) +
+            " alongLeft=" + alongLeft.ToString("0.###", CultureInfo.InvariantCulture) +
+            " leftOfTruck=" + MenuTarget.IsLeftOfTruck(alongLeft) +
+            " headLocked=False planePos=" + Format(display.position) +
             " planeViewport=" + Format(view) +
             " planeInView=" + inView +
             " cameraPos=" + Format(camera.transform.position) +
             " cameraFwd=" + Format(camera.transform.forward));
         ReleaseDesktopMirror(canvas);
+        return true;
     }
 
     internal static bool TryLocal(Transform ray, out Vector2 canvasLocal, out Vector3 world)
@@ -159,6 +178,85 @@ internal static class MenuPlacement
         return u >= 0f && u <= 1f && v >= 0f && v <= 1f;
     }
 
+    static bool TrySceneAnchor(Camera camera, out string anchorName, out Vector3 truckPosition,
+        out Vector3 standPosition, out Vector3 left, out Vector3 place, out float alongLeft)
+    {
+        anchorName = "";
+        truckPosition = standPosition = left = place = default;
+        alongLeft = 0f;
+        var truck = FindTruck();
+        if (truck == null)
+            return false;
+
+        anchorName = truck.name;
+        truckPosition = truck.position;
+        standPosition = SceneStand(camera.transform);
+        var flatLeft = MenuTarget.PlayerLeft(standPosition.x, standPosition.z, truckPosition.x, truckPosition.z);
+        left = new Vector3(flatLeft.x, flatLeft.y, flatLeft.z);
+        var gap = TruckRadius(truck) + WidthMeters * 0.5f + 1.2f;
+        var spot = MenuTarget.LeftOfTruck(truckPosition.x, truckPosition.z, left.x, left.z, gap, standPosition.y);
+        place = new Vector3(spot.x, spot.y, spot.z);
+        alongLeft = Vector3.Dot(place - truckPosition, left);
+        return true;
+    }
+
+    static Transform? FindTruck()
+    {
+        var animated = UnityEngine.Object.FindObjectOfType<TruckMenuAnimated>();
+        if (animated != null)
+            return animated.transform;
+
+        Transform? best = null;
+        var bestSize = 0f;
+        foreach (var renderer in UnityEngine.Object.FindObjectsOfType<Renderer>())
+        {
+            if (renderer == null || renderer.name.IndexOf("truck", StringComparison.OrdinalIgnoreCase) < 0 &&
+                (renderer.transform.parent == null ||
+                 renderer.transform.parent.name.IndexOf("truck", StringComparison.OrdinalIgnoreCase) < 0))
+                continue;
+
+            var size = renderer.bounds.size.sqrMagnitude;
+            if (size <= bestSize)
+                continue;
+
+            bestSize = size;
+            best = renderer.transform.parent != null &&
+                   renderer.transform.parent.name.IndexOf("truck", StringComparison.OrdinalIgnoreCase) >= 0
+                ? renderer.transform.parent
+                : renderer.transform;
+        }
+
+        return best;
+    }
+
+    static float TruckRadius(Transform truck)
+    {
+        var radius = 2f;
+        foreach (var renderer in truck.GetComponentsInChildren<Renderer>())
+        {
+            if (renderer == null)
+                continue;
+            var extent = renderer.bounds.extents.magnitude;
+            if (extent > radius)
+                radius = extent;
+        }
+
+        return radius;
+    }
+
+    static Vector3 SceneStand(Transform camera)
+    {
+        var stand = camera;
+        var cursor = camera;
+        while (cursor.parent != null && Vector3.Distance(cursor.parent.position, camera.position) < 8f)
+        {
+            cursor = cursor.parent;
+            stand = cursor;
+        }
+
+        return stand.position;
+    }
+
     static void ReleaseDesktopMirror(Canvas menuCanvas)
     {
         var named = GameObject.Find("UI/UI/Canvas");
@@ -172,7 +270,7 @@ internal static class MenuPlacement
             }
         }
 
-        foreach (var other in Object.FindObjectsOfType<Canvas>())
+        foreach (var other in UnityEngine.Object.FindObjectsOfType<Canvas>())
         {
             if (other == null || other == menuCanvas || !other.enabled)
                 continue;

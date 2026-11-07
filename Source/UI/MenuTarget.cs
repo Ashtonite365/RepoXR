@@ -71,4 +71,25 @@ internal static class MenuTarget
 
         return (localX / width + 0.5f, localY / height + 0.5f);
     }
+
+    /// <summary>
+    /// Horizontal left when standing at <paramref name="stand"/> and facing the truck.
+    /// Independent of headset yaw. Facing +Z yields -X.
+    /// </summary>
+    internal static (float x, float y, float z) PlayerLeft(float standX, float standZ, float truckX, float truckZ)
+    {
+        var fx = truckX - standX;
+        var fz = truckZ - standZ;
+        var mag = MathF.Sqrt(fx * fx + fz * fz);
+        if (mag < 0.01f)
+            return (-1f, 0f, 0f);
+
+        return (-fz / mag, 0f, fx / mag);
+    }
+
+    internal static (float x, float y, float z) LeftOfTruck(float truckX, float truckZ, float leftX, float leftZ,
+        float gap, float eyeY) =>
+        (truckX + leftX * gap, eyeY, truckZ + leftZ * gap);
+
+    internal static bool IsLeftOfTruck(float alongLeft) => alongLeft > 0.25f;
 }

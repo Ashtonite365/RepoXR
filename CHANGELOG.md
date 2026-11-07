@@ -1,3 +1,8 @@
+# 1.3.18 (RepoFBT)
+
+**Fixes**:
+- The menu plane is no longer placed 1.4 m in front of the headset. It is placed once to the left of the main-menu truck, using the truck and the camera rig's standing position, and it stays there. The game's HUD canvas is still only drawn onto that plane. The controller ray on the plane is still the coordinate the game's hover already reads. The log records the truck, the standing position, and `leftOfTruck`, not a view-centre success.
+
 # 1.3.17 (RepoFBT)
 
 **Fixes**:
