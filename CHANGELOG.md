@@ -1,3 +1,9 @@
+# 1.3.21 (RepoFBT)
+
+**Fixes**:
+- The menu presentation is the 1.3.17 implementation again (`8412213`): the game's HUD canvas is drawn into a texture and shown on a world plane, the ray on that plane is still the game's hover coordinate, and the plane is unparented after it is placed. The 1.3.18–1.3.20 renderer search, view cone, and bounds clearance are not used.
+- The plane is then moved once from the menu truck's `frontPanelTransform`: 1.2 m along that panel's horizontal forward, 0.6 m to its right, yawed 21.6° so the visible face points toward the truck's left and a little forward, and raised 0.4 m. If that panel is missing, the plane stays on the 1.3.17 camera pose. The truck and the camera are not moved.
+
 # 1.3.20 (RepoFBT)
 
 **Fixes**:

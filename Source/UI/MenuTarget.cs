@@ -73,86 +73,24 @@ internal static class MenuTarget
     }
 
     /// <summary>
-    /// Horizontal left of the camera's view. <paramref name="rightX"/> and <paramref name="rightZ"/>
-    /// are the camera's right vector with vertical removed. Looking along +Z, right is +X, so left is -X.
-    /// This is not the truck's local left.
+    /// Placement-only offset from the right-hand sketch. The truck arrow points forward.
+    /// The menu is 1.2 m in front of the truck point and 0.6 m to the truck's right.
+    /// Its visible face points toward the truck's left, 21.6° toward forward.
+    /// Height is the truck point plus a 0.4 m raise. No bounds or view test.
     /// </summary>
-    internal static (float x, float y, float z) CameraViewLeft(float rightX, float rightZ)
+    internal const float MenuForwardMeters = 1.2f;
+    internal const float MenuRightMeters = 0.6f;
+    internal const float MenuRaiseMeters = 0.4f;
+    internal const float MenuYawDegrees = 21.6f;
+
+    internal static (float x, float y, float z, float faceX, float faceZ) MenuPose(
+        float truckX, float truckY, float truckZ, float forwardX, float forwardZ, float rightX, float rightZ)
     {
-        var mag = MathF.Sqrt(rightX * rightX + rightZ * rightZ);
-        if (mag < 0.01f)
-            return (-1f, 0f, 0f);
-
-        return (-rightX / mag, 0f, -rightZ / mag);
-    }
-
-    internal static (float x, float y, float z) LeftOfTruck(float truckX, float truckZ, float leftX, float leftZ,
-        float gap, float eyeY) =>
-        (truckX + leftX * gap, eyeY, truckZ + leftZ * gap);
-
-    internal static bool IsLeftOfTruck(float alongLeft) => alongLeft > 0.25f;
-
-    internal static float Ahead(float camX, float camZ, float fwdX, float fwdZ, float pointX, float pointZ) =>
-        (pointX - camX) * fwdX + (pointZ - camZ) * fwdZ;
-
-    internal static bool InFrontOfCamera(float ahead, float maxDistance) => ahead > 1f && ahead < maxDistance;
-
-    /// <summary>
-    /// The 1.3.19 gate used <see cref="Ahead"/> alone. The controller mesh at
-    /// (-17.754, 4.503) is only about 1.8 m along the camera's horizontal forward
-    /// and about 18 m to the side, so that gate accepted it.
-    /// </summary>
-    internal static (float ahead, float lateral) ViewOffset(float camX, float camZ, float fwdX, float fwdZ,
-        float pointX, float pointZ)
-    {
-        var mag = MathF.Sqrt(fwdX * fwdX + fwdZ * fwdZ);
-        if (mag < 0.01f)
-            return (0f, 999f);
-
-        var fx = fwdX / mag;
-        var fz = fwdZ / mag;
-        var dx = pointX - camX;
-        var dz = pointZ - camZ;
-        var ahead = dx * fx + dz * fz;
-        var sideX = dx - fx * ahead;
-        var sideZ = dz - fz * ahead;
-        return (ahead, MathF.Sqrt(sideX * sideX + sideZ * sideZ));
-    }
-
-    internal static bool InViewCone(float ahead, float lateral) =>
-        ahead > 0.5f && ahead < 18f && lateral < 8f && lateral < ahead * 1.25f;
-
-    internal const float SketchYawDegrees = 21.6f;
-    internal const float SketchRaiseMeters = 0.4f;
-    internal const float SketchForwardGap = 0.7f;
-    internal const float SketchRightFraction = 0.24f;
-    internal const float MaxHalfExtent = 4f;
-
-    /// <summary>
-    /// Overhead pose from the sketch's right-hand truck. Forward is the truck's green arrow.
-    /// The menu sits just past the nose, slightly to the truck's right, and its visible face
-    /// points toward the truck's left, yawed <see cref="SketchYawDegrees"/> toward forward.
-    /// Extents are capped so a controller-sized bounds cannot push the plane tens of metres away.
-    /// </summary>
-    internal static (float x, float y, float z, float faceX, float faceZ) SketchPose(
-        float centerX, float centerZ, float forwardX, float forwardZ, float rightX, float rightZ,
-        float halfForward, float halfRight, float eyeY)
-    {
-        if (halfForward > MaxHalfExtent)
-            halfForward = MaxHalfExtent;
-        if (halfRight > MaxHalfExtent)
-            halfRight = MaxHalfExtent;
-
-        var rightShift = halfRight * 2f * SketchRightFraction;
-        if (rightShift > 1.2f)
-            rightShift = 1.2f;
-
-        var along = halfForward + SketchForwardGap;
-        var x = centerX + forwardX * along + rightX * rightShift;
-        var z = centerZ + forwardZ * along + rightZ * rightShift;
-        var yaw = SketchYawDegrees * MathF.PI / 180f;
+        var x = truckX + forwardX * MenuForwardMeters + rightX * MenuRightMeters;
+        var z = truckZ + forwardZ * MenuForwardMeters + rightZ * MenuRightMeters;
+        var yaw = MenuYawDegrees * MathF.PI / 180f;
         var faceX = -rightX * MathF.Cos(yaw) + forwardX * MathF.Sin(yaw);
         var faceZ = -rightZ * MathF.Cos(yaw) + forwardZ * MathF.Sin(yaw);
-        return (x, eyeY + SketchRaiseMeters, z, faceX, faceZ);
+        return (x, truckY + MenuRaiseMeters, z, faceX, faceZ);
     }
 }

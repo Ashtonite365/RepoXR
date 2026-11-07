@@ -30,6 +30,7 @@ Here is a list of RepoXR versions and which version(s) of R.E.P.O. it supports
 
 | RepoXR FBT | R.E.P.O. Version |
 |------------|------------------|
+| v1.3.21 (1.3.17 menu, moved to the sketch pose) | v0.5.1 |
 | v1.3.20 (menu in front of the visible truck, turned to the sketch) | v0.5.1 |
 | v1.3.19 (menu plane is left of the truck in the camera's view) | v0.5.1 |
 | v1.3.18 (menu plane stays left of the truck) | v0.5.1 |
